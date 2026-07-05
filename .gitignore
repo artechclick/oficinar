@@ -1,0 +1,27 @@
+# Dependencias
+node_modules/
+**/node_modules/
+
+# Salida de compilación
+dist/
+build/*.exe
+*.log
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Temporales
+*.tmp
+*.temp
+npm-debug.log*
+
+# Configuración local del usuario (claves de IA, etc.)
+oficinar-config.json
+
+# Proyecto standalone antiguo de Calcular (solo el de la raíz, no apps/calcular)
+/Calcular/

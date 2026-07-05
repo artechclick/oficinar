@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Presentar</title>
+  <link rel="stylesheet" href="estilos.css">
+  <link rel="stylesheet" href="../../shared/ia.css">
+  <link rel="stylesheet" href="../../shared/responsive.css">
+</head>
+<body>
+
+  <!-- Cinta de opciones (estilo PowerPoint) -->
+  <div id="cinta">
+    <div class="cinta-pestanas">
+      <span class="pestana activa">Inicio</span>
+    </div>
+    <div class="cinta-contenido">
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <button class="btn" id="btnDeshacer" title="Deshacer (Ctrl+Z)">&#8630;</button>
+          <button class="btn" id="btnRehacer" title="Rehacer (Ctrl+Y)">&#8631;</button>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn btn-texto" id="btnNuevaDiapo" title="Nueva diapositiva con plantilla">+ Diapositiva &#9660;</button>
+        </div>
+        <div class="grupo-titulo">Diapositivas</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <button class="btn btn-texto" id="btnTexto" title="Insertar cuadro de texto">&#128441; Texto</button>
+          <button class="btn btn-texto" id="btnImagen" title="Insertar imagen">&#128444; Imagen</button>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn" id="btnRect" title="Rectángulo">&#9645;</button>
+          <button class="btn" id="btnRectRed" title="Rectángulo redondeado">&#9634;</button>
+          <button class="btn" id="btnElipse" title="Elipse">&#9711;</button>
+          <button class="btn" id="btnTriangulo" title="Triángulo">&#9651;</button>
+          <button class="btn" id="btnFlecha" title="Flecha">&#10230;</button>
+          <button class="btn" id="btnLinea" title="Línea">&#9472;</button>
+          <button class="btn" id="btnEstrella" title="Estrella">&#9733;</button>
+          <button class="btn" id="btnRombo" title="Rombo">&#9670;</button>
+          <button class="btn" id="btnPentagono" title="Pentágono">&#11040;</button>
+          <button class="btn" id="btnHexagono" title="Hexágono">&#11042;</button>
+          <button class="btn" id="btnGlobo" title="Globo de diálogo">&#128488;</button>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn btn-texto" id="btnTabla" title="Insertar tabla">&#9638; Tabla</button>
+          <button class="btn btn-texto" id="btnVideo" title="Insertar video">&#127909; Video</button>
+          <button class="btn btn-texto" id="btnAudio" title="Insertar audio">&#127925; Audio</button>
+        </div>
+        <div class="grupo-titulo">Insertar</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <select id="selFuente" title="Fuente"></select>
+          <select id="selTamano" title="Tamaño">
+            <option>12</option><option>14</option><option>16</option><option>18</option>
+            <option selected>24</option><option>28</option><option>32</option><option>40</option>
+            <option>48</option><option>60</option><option>72</option><option>96</option>
+          </select>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn fmt" id="btnNegrita" title="Negrita"><b>N</b></button>
+          <button class="btn fmt" id="btnCursiva" title="Cursiva"><i>K</i></button>
+          <button class="btn fmt" id="btnSubrayado" title="Subrayado"><u>S</u></button>
+          <span class="sep-v"></span>
+          <button class="btn" id="alignIzq" title="Alinear a la izquierda">&#8676;</button>
+          <button class="btn" id="alignCentro" title="Centrar">&#8596;</button>
+          <button class="btn" id="alignDer" title="Alinear a la derecha">&#8677;</button>
+          <button class="btn" id="btnListaVineta" title="Lista con viñetas (al editar texto)">&#8226;&#8212;</button>
+          <button class="btn" id="btnListaNum" title="Lista numerada (al editar texto)">1.&#8212;</button>
+        </div>
+        <div class="grupo-titulo">Fuente</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <label class="btn color-btn" title="Color de texto">
+            <span class="color-icono" id="iconoColorTexto">A</span>
+            <input type="color" id="colorTexto" value="#1d2433">
+          </label>
+          <label class="btn color-btn" title="Color de relleno de la forma">
+            <span class="color-icono" id="iconoColorRelleno">&#9639;</span>
+            <input type="color" id="colorRelleno" value="#ef8f3c">
+          </label>
+          <label class="btn color-btn" title="Color de borde">
+            <span class="color-icono" id="iconoColorBorde">&#9634;</span>
+            <input type="color" id="colorBorde" value="#c05621">
+          </label>
+          <button class="btn" id="btnSinRelleno" title="Quitar relleno y borde del cuadro">&#8709;</button>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn btn-texto" id="btnAlFrente" title="Traer al frente">&#8613; Frente</button>
+          <button class="btn btn-texto" id="btnAlFondo" title="Enviar al fondo">&#8615; Fondo</button>
+          <button class="btn" id="btnEliminarObj" title="Eliminar objeto seleccionado (Supr)">&#128465;</button>
+        </div>
+        <div class="grupo-titulo">Objeto</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <button class="btn" id="btnRotIzq" title="Girar 15° a la izquierda">&#8634;</button>
+          <button class="btn" id="btnRotDer" title="Girar 15° a la derecha">&#8635;</button>
+          <label class="btn color-btn" title="Relleno con degradado">
+            <span class="color-icono" style="border-bottom-color:#7a6cff">&#9673;</span>
+            <input type="color" id="colorDegradado" value="#7a6cff">
+          </label>
+          <button class="btn" id="btnSombra" title="Activar/quitar sombra">&#9723;</button>
+        </div>
+        <div class="grupo-fila">
+          <span style="font-size:11px;color:#766">Opac.</span>
+          <input type="range" id="rangoOpacidad" min="10" max="100" value="100" style="width:70px" title="Opacidad del objeto">
+        </div>
+        <div class="grupo-titulo">Formato</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <button class="btn" id="btnAlinIzq" title="Alinear a la izquierda">&#9612;</button>
+          <button class="btn" id="btnAlinCH" title="Centrar horizontalmente">&#9614;</button>
+          <button class="btn" id="btnAlinDer" title="Alinear a la derecha">&#9616;</button>
+          <button class="btn" id="btnAlinSup" title="Alinear arriba">&#9600;</button>
+          <button class="btn" id="btnAlinCV" title="Centrar verticalmente">&#9601;</button>
+          <button class="btn" id="btnAlinInf" title="Alinear abajo">&#9604;</button>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn" id="btnDistH" title="Distribuir horizontalmente">&#8703;</button>
+          <button class="btn" id="btnDistV" title="Distribuir verticalmente">&#8693;</button>
+          <button class="btn btn-texto" id="btnAgrupar" title="Agrupar (Ctrl+G)">&#128279; Agrupar</button>
+          <button class="btn btn-texto" id="btnDesagrupar" title="Desagrupar">Desagr.</button>
+        </div>
+        <div class="grupo-titulo">Organizar</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <select id="selTema" title="Tema de la presentación">
+            <option value="claro">Tema claro</option>
+            <option value="oscuro">Tema oscuro</option>
+            <option value="degradado">Degradado azul</option>
+            <option value="atardecer">Atardecer</option>
+            <option value="bosque">Bosque</option>
+            <option value="cristal">Cristal</option>
+          </select>
+          <label class="btn color-btn" title="Color de fondo de la diapositiva">
+            <span class="color-icono" id="iconoColorFondoD">&#9635;</span>
+            <input type="color" id="colorFondoDiapo" value="#ffffff">
+          </label>
+        </div>
+        <div class="grupo-fila">
+          <select id="selTransicion" title="Transición entre diapositivas">
+            <option value="ninguna">Sin transición</option>
+            <option value="fundido" selected>Fundido</option>
+            <option value="deslizar">Deslizar (empuje)</option>
+            <option value="barrido">Barrido</option>
+            <option value="zoom">Zoom</option>
+            <option value="giro">Giro</option>
+            <option value="cubo">Cubo</option>
+          </select>
+          <select id="selRelacion" title="Relación de aspecto del lienzo">
+            <option value="16:9" selected>Pantalla 16:9</option>
+            <option value="4:3">Estándar 4:3</option>
+          </select>
+        </div>
+        <div class="grupo-fila">
+          <select id="selAnimTipo" title="Tipo de evento de animación">
+            <option value="entrada">Entrada</option>
+            <option value="enfasis">Énfasis</option>
+            <option value="salida">Salida</option>
+          </select>
+          <select id="selAnimacion" title="Animación del objeto seleccionado (se reproduce con cada clic al presentar)">
+            <option value="ninguna">Sin animación</option>
+            <option value="aparecer">Aparecer</option>
+            <option value="desvanecer">Desvanecer</option>
+            <option value="deslizarIzq">Desde la izquierda</option>
+            <option value="deslizarDer">Desde la derecha</option>
+            <option value="subir">Subir</option>
+            <option value="zoom">Zoom</option>
+            <option value="rebote">Rebote</option>
+            <option value="pulso">Pulso (énfasis)</option>
+            <option value="girar">Girar (énfasis)</option>
+            <option value="salirDesvanecer">Salir desvaneciendo</option>
+          </select>
+        </div>
+        <div class="grupo-titulo">Diseño · Animación</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <button class="btn btn-texto btn-presentar" id="btnPresentar" title="Iniciar presentación (F5)">&#9654; Presentar</button>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn btn-texto" id="btnModerador" title="Vista del moderador (cronómetro + notas)">&#128100; Moderador</button>
+          <button class="btn btn-texto btn-ia" id="btnIA" title="Asistente IA (Ctrl+I)">&#10024; IA</button>
+        </div>
+        <div class="grupo-titulo">Presentación · IA</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Área principal -->
+  <div id="areaTrabajo">
+    <div id="panelMiniaturas"></div>
+    <div id="areaCentral">
+      <div id="areaLienzo">
+        <div id="lienzoContenedor">
+          <div id="lienzo"></div>
+        </div>
+      </div>
+      <div id="barraNotas">
+        <span class="notas-etiqueta">&#128221; Notas del orador:</span>
+        <textarea id="notasOrador" placeholder="Escribe aquí las notas de esta diapositiva (visibles en la vista del moderador)..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Barra de estado -->
+  <div id="barraEstado">
+    <span id="estadoArchivo">Presentación nueva</span>
+    <span id="estadoDiapo">Diapositiva 1 de 1</span>
+  </div>
+
+  <!-- Modo presentación -->
+  <div id="modoPresentacion" class="oculto">
+    <div id="presDiapo"></div>
+    <canvas id="presTinta"></canvas>
+    <div id="presPuntero" class="oculto"></div>
+    <div id="presContador"></div>
+    <div id="presHerramientas">
+      <button data-pres-h="puntero" title="Puntero láser">&#128308;</button>
+      <button data-pres-h="tinta" title="Lápiz de tinta">&#9998;</button>
+      <button data-pres-h="resaltar" title="Resaltador">&#128396;</button>
+      <button id="presLimpiar" title="Borrar trazos">&#9003;</button>
+      <button id="presSalir" title="Salir (Esc)">&#10005;</button>
+    </div>
+  </div>
+
+  <!-- Vista del moderador -->
+  <div id="vistaModerador" class="oculto">
+    <div class="mod-cabecera">
+      <span id="modReloj">00:00</span>
+      <span id="modTitulo">Vista del moderador</span>
+      <button id="modSalir">Salir</button>
+    </div>
+    <div class="mod-cuerpo">
+      <div class="mod-actual">
+        <div class="mod-sub">Diapositiva actual</div>
+        <div id="modActual" class="mod-lienzo-mini"></div>
+      </div>
+      <div class="mod-lado">
+        <div class="mod-sub">Siguiente</div>
+        <div id="modSiguiente" class="mod-lienzo-mini pequeno"></div>
+        <div class="mod-sub">Notas</div>
+        <div id="modNotas"></div>
+        <div class="mod-nav">
+          <button id="modAnt">&#8592; Anterior</button>
+          <span id="modContador"></span>
+          <button id="modSig">Siguiente &#8594;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../shared/fuentes.js"></script>
+  <script src="renderer.js"></script>
+  <script src="../../shared/cinta-responsive.js"></script>
+  <script src="../../shared/ia.js"></script>
+</body>
+</html>

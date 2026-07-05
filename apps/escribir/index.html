@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Escribir</title>
+  <link rel="stylesheet" href="estilos.css">
+  <link rel="stylesheet" href="../../shared/ia.css">
+  <link rel="stylesheet" href="../../shared/responsive.css">
+</head>
+<body>
+
+  <!-- Cinta de opciones (estilo Word) -->
+  <div id="cinta">
+    <div class="cinta-pestanas">
+      <span class="pestana activa">Inicio</span>
+    </div>
+    <div class="cinta-contenido">
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <button class="btn" id="btnDeshacer" title="Deshacer (Ctrl+Z)">&#8630;</button>
+          <button class="btn" id="btnRehacer" title="Rehacer (Ctrl+Y)">&#8631;</button>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn" id="btnCortar" title="Cortar (Ctrl+X)">&#9986;</button>
+          <button class="btn" id="btnCopiar" title="Copiar (Ctrl+C)">&#10064;</button>
+          <button class="btn" id="btnPegar" title="Pegar (Ctrl+V)">&#128203;</button>
+        </div>
+        <div class="grupo-titulo">Portapapeles</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <select id="selEstilo" title="Estilos de párrafo">
+            <option value="p">Normal</option>
+            <option value="h1">Título 1</option>
+            <option value="h2">Título 2</option>
+            <option value="h3">Título 3</option>
+            <option value="h4">Título 4</option>
+            <option value="blockquote">Cita</option>
+            <option value="pre">Código</option>
+          </select>
+          <select id="selFuente" title="Fuente"></select>
+          <select id="selTamano" title="Tamaño de fuente">
+            <option>8</option><option>9</option><option>10</option><option>11</option>
+            <option selected>12</option><option>14</option><option>16</option><option>18</option>
+            <option>20</option><option>24</option><option>28</option><option>32</option>
+            <option>36</option><option>48</option><option>72</option>
+          </select>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn fmt" id="btnNegrita" title="Negrita (Ctrl+N)"><b>N</b></button>
+          <button class="btn fmt" id="btnCursiva" title="Cursiva (Ctrl+K)"><i>K</i></button>
+          <button class="btn fmt" id="btnSubrayado" title="Subrayado (Ctrl+S)"><u>S</u></button>
+          <button class="btn fmt" id="btnTachado" title="Tachado"><s>ab</s></button>
+          <button class="btn fmt" id="btnSub" title="Subíndice">x<sub>2</sub></button>
+          <button class="btn fmt" id="btnSuper" title="Superíndice">x<sup>2</sup></button>
+          <span class="sep-v"></span>
+          <label class="btn color-btn" title="Color de fuente">
+            <span class="color-icono" id="iconoColorTexto">A</span>
+            <input type="color" id="colorTexto" value="#c00000">
+          </label>
+          <label class="btn color-btn" title="Color de resaltado">
+            <span class="color-icono" id="iconoColorResaltado">&#9998;</span>
+            <input type="color" id="colorResaltado" value="#ffff00">
+          </label>
+          <button class="btn" id="btnBorrarFormato" title="Borrar formato">&#9003;</button>
+        </div>
+        <div class="grupo-titulo">Fuente</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <button class="btn fmt" id="alignIzq" title="Alinear a la izquierda">&#8676;</button>
+          <button class="btn fmt" id="alignCentro" title="Centrar">&#8596;</button>
+          <button class="btn fmt" id="alignDer" title="Alinear a la derecha">&#8677;</button>
+          <button class="btn fmt" id="alignJust" title="Justificar">&#9776;</button>
+          <span class="sep-v"></span>
+          <select id="selInterlineado" title="Interlineado">
+            <option value="1">1,0</option>
+            <option value="1.15" selected>1,15</option>
+            <option value="1.5">1,5</option>
+            <option value="2">2,0</option>
+            <option value="2.5">2,5</option>
+          </select>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn" id="btnListaNum" title="Lista numerada">1.&#8212;</button>
+          <button class="btn" id="btnListaVineta" title="Lista con viñetas">&#8226;&#8212;</button>
+          <button class="btn" id="btnSangriaMenos" title="Disminuir sangría">&#8676;|</button>
+          <button class="btn" id="btnSangriaMas" title="Aumentar sangría">|&#8677;</button>
+        </div>
+        <div class="grupo-titulo">Párrafo</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <button class="btn btn-texto" id="btnImagen" title="Insertar imagen">&#128444; Imagen</button>
+          <button class="btn btn-texto" id="btnTabla" title="Insertar tabla">&#9638; Tabla</button>
+          <button class="btn" id="btnTablaMenu" title="Herramientas de tabla: filas, columnas, combinar, fórmula">&#9660;</button>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn btn-texto" id="btnEnlace" title="Insertar enlace">&#128279; Enlace</button>
+          <button class="btn btn-texto" id="btnSimbolo" title="Insertar símbolo">&Omega; Símbolo</button>
+        </div>
+        <div class="grupo-titulo">Insertar</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <button class="btn btn-texto" id="btnEncabezado" title="Editar encabezado y pie de página">&#9612; Encab./pie</button>
+          <button class="btn btn-texto" id="btnTOC" title="Insertar tabla de contenido a partir de los títulos">&#9776; Índice</button>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn btn-texto" id="btnNotaPie" title="Insertar nota al pie">ab&sup1; Nota</button>
+          <button class="btn btn-texto" id="btnColumnas" title="Dividir el texto en columnas">&#9707; Columnas &#9660;</button>
+        </div>
+        <div class="grupo-titulo">Referencias</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <button class="btn btn-texto" id="btnBuscar" title="Buscar (Ctrl+B)">&#128269; Buscar</button>
+          <button class="btn btn-texto activo" id="btnAutocorregir" title="Autocorrección ortográfica mientras escribes">&#10003; Autocorregir</button>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn btn-texto" id="btnExportarPDF" title="Exportar a PDF">&#8595; PDF</button>
+        </div>
+        <div class="grupo-titulo">Edición</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <button class="btn btn-texto" id="btnDisenoPagina" title="Tamaño, orientación, márgenes y color de la hoja">&#9636; Hoja</button>
+        </div>
+        <div class="grupo-fila">
+          <select id="selZoom" title="Zoom">
+            <option value="0.5">50%</option>
+            <option value="0.75">75%</option>
+            <option value="1" selected>100%</option>
+            <option value="1.25">125%</option>
+            <option value="1.5">150%</option>
+            <option value="2">200%</option>
+          </select>
+        </div>
+        <div class="grupo-titulo">Página</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <button class="btn btn-texto btn-ia" id="btnIA" title="Asistente IA (Ctrl+I)">&#10024; Asistente</button>
+        </div>
+        <div class="grupo-fila"></div>
+        <div class="grupo-titulo">IA</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Área del documento -->
+  <div id="areaDoc">
+    <div id="regla"></div>
+    <div id="marcoPagina">
+      <div class="pagina" contenteditable="true" spellcheck="true"><p><br></p></div>
+    </div>
+  </div>
+
+  <!-- Panel flotante para configurar la imagen seleccionada -->
+  <div id="panelImagen" class="oculto">
+    <div class="pi-fila">
+      <span class="pi-etiqueta">Tamaño</span>
+      <input type="range" id="imgAncho" min="10" max="100" value="100" title="Ancho de la imagen (%)">
+      <span id="imgAnchoValor">100%</span>
+    </div>
+    <div class="pi-fila">
+      <span class="pi-etiqueta">Posición</span>
+      <button class="btn" id="imgIzq" title="Texto a la derecha (imagen a la izquierda)">&#8676;&#9639;</button>
+      <button class="btn" id="imgCentro" title="Centrada en línea propia">&#8596;&#9639;</button>
+      <button class="btn" id="imgDer" title="Texto a la izquierda (imagen a la derecha)">&#9639;&#8677;</button>
+      <button class="btn" id="imgLinea" title="En línea con el texto">&#182;&#9639;</button>
+      <span class="sep-v"></span>
+      <button class="btn" id="imgEliminar" title="Eliminar imagen">&#128465;</button>
+    </div>
+  </div>
+
+  <!-- Barra de estado -->
+  <div id="barraEstado">
+    <span id="estadoArchivo">Documento nuevo</span>
+    <span id="estadoPaginas">Página 1 de 1</span>
+    <span id="estadoStats">0 palabras · 0 caracteres</span>
+  </div>
+
+  <!-- Diálogo buscar y reemplazar -->
+  <div id="dialogoBuscar" class="dialogo-fondo oculto">
+    <div class="dialogo">
+      <div class="dialogo-titulo">Buscar y reemplazar <button class="btn-cerrar" data-cerrar>&#10005;</button></div>
+      <div class="dialogo-cuerpo">
+        <input id="textoBuscar" placeholder="Buscar..." spellcheck="false">
+        <input id="textoReemplazar" placeholder="Reemplazar con..." spellcheck="false">
+        <div id="resultadoBuscar"></div>
+      </div>
+      <div class="dialogo-pie">
+        <button class="btn-dialogo" id="btnBuscarSig">Buscar siguiente</button>
+        <button class="btn-dialogo" id="btnReemplazar">Reemplazar</button>
+        <button class="btn-dialogo" id="btnReemplazarTodo">Reemplazar todo</button>
+        <button class="btn-dialogo secundario" data-cerrar>Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diálogo tabla -->
+  <div id="dialogoTabla" class="dialogo-fondo oculto">
+    <div class="dialogo dialogo-chico">
+      <div class="dialogo-titulo">Insertar tabla <button class="btn-cerrar" data-cerrar>&#10005;</button></div>
+      <div class="dialogo-cuerpo">
+        <label>Filas <input type="number" id="tablaFilas" value="3" min="1" max="50"></label>
+        <label>Columnas <input type="number" id="tablaCols" value="3" min="1" max="20"></label>
+        <label><input type="checkbox" id="tablaCabecera" checked> Con fila de encabezado</label>
+      </div>
+      <div class="dialogo-pie">
+        <button class="btn-dialogo" id="btnTablaOk">Insertar</button>
+        <button class="btn-dialogo secundario" data-cerrar>Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diálogo enlace -->
+  <div id="dialogoEnlace" class="dialogo-fondo oculto">
+    <div class="dialogo dialogo-chico">
+      <div class="dialogo-titulo">Insertar enlace <button class="btn-cerrar" data-cerrar>&#10005;</button></div>
+      <div class="dialogo-cuerpo">
+        <input id="enlaceTexto" placeholder="Texto a mostrar" spellcheck="false">
+        <input id="enlaceURL" placeholder="https://..." spellcheck="false">
+      </div>
+      <div class="dialogo-pie">
+        <button class="btn-dialogo" id="btnEnlaceOk">Insertar</button>
+        <button class="btn-dialogo secundario" data-cerrar>Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diálogo diseño de página -->
+  <div id="dialogoPagina" class="dialogo-fondo oculto">
+    <div class="dialogo dialogo-chico">
+      <div class="dialogo-titulo">Diseño de página <button class="btn-cerrar" data-cerrar>&#10005;</button></div>
+      <div class="dialogo-cuerpo">
+        <label>Tamaño
+          <select id="pagTamano">
+            <option value="carta">Carta (21,6 × 27,9 cm)</option>
+            <option value="a4">A4 (21 × 29,7 cm)</option>
+            <option value="oficio">Oficio (21,6 × 35,6 cm)</option>
+          </select>
+        </label>
+        <label>Orientación
+          <select id="pagOrientacion">
+            <option value="vertical">Vertical</option>
+            <option value="horizontal">Horizontal</option>
+          </select>
+        </label>
+        <label>Márgenes
+          <select id="pagMargen">
+            <option value="96">Normal (2,5 cm)</option>
+            <option value="48">Estrecho (1,3 cm)</option>
+            <option value="144">Ancho (3,8 cm)</option>
+            <option value="72">Moderado (1,9 cm)</option>
+          </select>
+        </label>
+        <label>Encabezado
+          <input id="pagTextoEncab" placeholder="(vacío)" spellcheck="false" style="flex:1">
+        </label>
+        <label>Pie de página
+          <input id="pagTextoPie" placeholder="Usa {pagina}, {total}, {fecha}" spellcheck="false" style="flex:1">
+        </label>
+        <label>Color de la hoja
+          <input type="color" id="pagColor" value="#ffffff" style="width:60px;height:28px;padding:2px">
+        </label>
+      </div>
+      <div class="dialogo-pie">
+        <button class="btn-dialogo" id="btnPaginaOk">Aplicar</button>
+        <button class="btn-dialogo secundario" data-cerrar>Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diálogo símbolo -->
+  <div id="dialogoSimbolo" class="dialogo-fondo oculto">
+    <div class="dialogo dialogo-chico">
+      <div class="dialogo-titulo">Insertar símbolo <button class="btn-cerrar" data-cerrar>&#10005;</button></div>
+      <div class="dialogo-cuerpo">
+        <div id="rejillaSimbolos"></div>
+      </div>
+      <div class="dialogo-pie">
+        <button class="btn-dialogo secundario" data-cerrar>Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../shared/fuentes.js"></script>
+  <script src="renderer.js"></script>
+  <script src="../../shared/cinta-responsive.js"></script>
+  <script src="../../shared/ia.js"></script>
+</body>
+</html>

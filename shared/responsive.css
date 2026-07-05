@@ -1,0 +1,51 @@
+/* ===== Oficinar - responsive compartido ===== */
+
+/* La cinta ocupa una fila; el botón Más queda anclado a la derecha */
+#cinta { position: relative; }
+.cinta-contenido { min-width: 0; }
+/* Los grupos conservan su ancho natural (no se comprimen): así el desbordamiento
+   se detecta y se recogen en "Más" en vez de quedar apretados/superpuestos */
+.cinta-contenido > .grupo { flex: 0 0 auto; }
+
+.cinta-mas {
+  position: absolute; top: 50%; right: 6px; transform: translateY(-30%);
+  z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-width: 42px; height: 42px; padding: 2px 8px; cursor: pointer;
+  border: 1px solid rgba(150, 160, 190, .5); border-radius: 9px;
+  background: rgba(255, 255, 255, .82); backdrop-filter: blur(10px);
+  color: #3a4763; box-shadow: 0 3px 10px rgba(40, 60, 110, .16);
+}
+.cinta-mas span { font-size: 15px; line-height: 1; }
+.cinta-mas small { font-size: 9px; margin-top: 1px; }
+.cinta-mas:hover, .cinta-mas.activo-cinta { background: #fff; border-color: #7a8fc0; }
+
+.cinta-mas-panel {
+  position: fixed; z-index: 320;
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px;
+  max-width: min(560px, 94vw); max-height: 70vh; overflow: auto;
+  padding: 10px; border-radius: 14px;
+  background: rgba(255, 255, 255, .95); backdrop-filter: blur(20px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, .8);
+  box-shadow: 0 16px 44px rgba(30, 50, 90, .28);
+}
+.cinta-mas-panel .grupo { border-right: none !important; background: rgba(240,244,252,.6); border-radius: 10px; }
+
+.oculto-cinta { display: none !important; }
+
+/* Cuando la cinta desborda, el botón Más reserva espacio a la derecha */
+#cinta:has(.cinta-mas:not(.oculto-cinta)) .cinta-contenido { padding-right: 52px; }
+
+/* ===== Panel del Asistente IA ===== */
+@media (max-width: 620px) {
+  #iaPanel { width: 100vw !important; }
+}
+#iaPanel { max-width: 100vw; }
+
+/* ===== Diálogos: nunca más anchos que la ventana ===== */
+.dialogo { max-width: 94vw; }
+
+/* ===== Utilidades ===== */
+@media (max-width: 760px) {
+  .grupo-titulo { font-size: 9px; }
+  .btn-texto { font-size: 11px; }
+}

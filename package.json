@@ -1,0 +1,63 @@
+{
+  "name": "oficinar",
+  "productName": "Oficinar",
+  "version": "1.0.0",
+  "description": "Oficinar - Suite de oficina: Calcular, Escribir, Presentar y Editar PDF, con asistente de IA integrado",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux",
+    "dist:mac": "electron-builder --mac"
+  },
+  "author": "ARTECH CLICK <artech.click@gmail.com>",
+  "license": "GPL-3.0",
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "hyperformula": "^3.3.0",
+    "mammoth": "^1.8.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "3.11.174"
+  },
+  "devDependencies": {
+    "electron": "^43.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "click.artech.oficinar",
+    "productName": "Oficinar",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "launcher/**/*",
+      "shared/**/*",
+      "apps/**/*",
+      "recursos/**/*",
+      "!**/node_modules/.cache"
+    ],
+    "win": {
+      "target": ["nsis"],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Oficinar"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "build/icon.png",
+      "category": "Office",
+      "maintainer": "ARTECH CLICK <artech.click@gmail.com>"
+    },
+    "mac": {
+      "target": ["dmg"],
+      "icon": "build/icon.png",
+      "category": "public.app-category.productivity"
+    }
+  }
+}

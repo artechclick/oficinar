@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Editar PDF</title>
+  <link rel="stylesheet" href="estilos.css">
+  <link rel="stylesheet" href="../../shared/ia.css">
+  <link rel="stylesheet" href="../../shared/responsive.css">
+</head>
+<body>
+
+  <!-- Cinta de opciones -->
+  <div id="cinta">
+    <div class="cinta-pestanas">
+      <span class="pestana activa">Inicio</span>
+    </div>
+    <div class="cinta-contenido">
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <button class="btn btn-texto" id="btnAbrir" title="Abrir PDF (Ctrl+A)">&#128194; Abrir</button>
+          <button class="btn btn-texto" id="btnGuardar" title="Guardar (Ctrl+G)">&#128190; Guardar</button>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn btn-texto" id="btnCombinar" title="Combinar con otro PDF">+ Combinar</button>
+          <button class="btn btn-texto" id="btnExtraer" title="Extraer páginas a un nuevo PDF">&#8688; Extraer</button>
+        </div>
+        <div class="grupo-titulo">Archivo</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <button class="btn herr activa" data-herr="mover" title="Seleccionar y mover (Esc)">&#10548;</button>
+          <button class="btn herr" data-herr="editar" title="Editar texto existente del PDF (E): haz clic sobre un texto para reescribirlo">&#9998;T</button>
+          <button class="btn herr" data-herr="texto" title="Agregar texto (T)">T</button>
+          <button class="btn herr" data-herr="nota" title="Nota adhesiva">&#128221;</button>
+          <button class="btn herr" data-herr="imagen" title="Insertar imagen" id="btnImagen">&#128444;</button>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn herr" data-herr="resaltar" title="Resaltar texto">&#9645;</button>
+          <button class="btn herr" data-herr="subrayar" title="Subrayar texto">U&#818;</button>
+          <button class="btn herr" data-herr="tachar" title="Tachar texto">S&#822;</button>
+          <button class="btn herr" data-herr="rect" title="Rectángulo">&#9634;</button>
+          <button class="btn herr" data-herr="dibujo" title="Dibujo a mano alzada">&#9998;</button>
+          <button class="btn herr" data-herr="redaccion" title="Redacción: oculta permanentemente el área seleccionada">&#9632;</button>
+        </div>
+        <div class="grupo-fila">
+          <select id="selTamanoTexto" title="Tamaño del texto">
+            <option>10</option><option>12</option><option selected>14</option>
+            <option>18</option><option>24</option><option>32</option><option>48</option>
+          </select>
+          <label class="btn color-btn" title="Color">
+            <span class="color-icono" id="iconoColor">A</span>
+            <input type="color" id="colorAnot" value="#d81b60">
+          </label>
+          <button class="btn" id="btnEliminarAnot" title="Eliminar anotación seleccionada (Supr)">&#128465;</button>
+        </div>
+        <div class="grupo-titulo">Herramientas</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <button class="btn btn-texto" id="btnRotarIzq" title="Rotar página a la izquierda">&#8634; Rotar</button>
+          <button class="btn btn-texto" id="btnRotarDer" title="Rotar página a la derecha">&#8635; Rotar</button>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn btn-texto" id="btnPagBlanco" title="Insertar página en blanco">+ Página</button>
+          <button class="btn btn-texto" id="btnDuplicarPag" title="Duplicar página actual">&#10697; Duplicar</button>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn btn-texto" id="btnEliminarPag" title="Eliminar página actual">&minus; Página</button>
+          <button class="btn btn-texto" id="btnDividir" title="Dividir el PDF en archivos por rangos">&#9988; Dividir</button>
+        </div>
+        <div class="grupo-titulo">Páginas</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <button class="btn btn-texto" id="btnAgregarMarcador" title="Agregar marcador en la página actual">&#128278; Marcador</button>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn btn-texto" id="btnAplanar" title="Aplanar: fija las anotaciones al contenido (no editables)">&#9635; Aplanar</button>
+        </div>
+        <div class="grupo-titulo">Documento</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <button class="btn" id="btnZoomMenos" title="Alejar">&minus;</button>
+          <select id="selZoom" title="Zoom">
+            <option value="0.5">50%</option>
+            <option value="0.75">75%</option>
+            <option value="1">100%</option>
+            <option value="1.25" selected>125%</option>
+            <option value="1.5">150%</option>
+            <option value="2">200%</option>
+            <option value="3">300%</option>
+          </select>
+          <button class="btn" id="btnZoomMas" title="Acercar">+</button>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn btn-texto btn-ia" id="btnIA" title="Asistente IA (Ctrl+I)">&#10024; Asistente</button>
+        </div>
+        <div class="grupo-titulo">Ver · IA</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Área principal -->
+  <div id="areaTrabajo">
+    <div id="panelLateral">
+      <div id="pestanasLateral">
+        <button class="pestana-lat activa" data-panel="miniaturas" title="Miniaturas de página">&#9638;</button>
+        <button class="pestana-lat" data-panel="marcadores" title="Marcadores">&#128278;</button>
+      </div>
+      <div id="panelMiniaturas" class="panel-lat"></div>
+      <div id="panelMarcadores" class="panel-lat oculto"></div>
+    </div>
+    <div id="visor">
+      <div id="mensajeInicial">
+        <div class="tarjeta-inicio">
+          <span class="icono-grande">&#128196;</span>
+          <h2>Editar PDF</h2>
+          <p>Abre un documento PDF para verlo y editarlo:<br>
+          edita o agrega texto, resalta, dibuja, rota y organiza páginas,<br>
+          combina documentos y extrae páginas.</p>
+          <button class="btn-abrir-grande" id="btnAbrirGrande">Abrir un PDF...</button>
+          <p style="margin-top:12px"><button class="btn-abrir-grande secundario-inicio" id="btnNuevoGrande">Crear PDF en blanco</button></p>
+        </div>
+      </div>
+      <div id="contenedorPaginas"></div>
+    </div>
+  </div>
+
+  <!-- Barra de estado -->
+  <div id="barraEstado">
+    <span id="estadoArchivo">Sin documento</span>
+    <span id="estadoPagina"></span>
+  </div>
+
+  <!-- Diálogo extraer páginas -->
+  <div id="dialogoExtraer" class="dialogo-fondo oculto">
+    <div class="dialogo">
+      <div class="dialogo-titulo">Extraer páginas <button class="btn-cerrar" data-cerrar>&#10005;</button></div>
+      <div class="dialogo-cuerpo">
+        <p>Indica las páginas a extraer, por ejemplo: <b>1-3, 5, 8-10</b></p>
+        <input id="rangoExtraer" placeholder="1-3, 5" spellcheck="false">
+      </div>
+      <div class="dialogo-pie">
+        <button class="btn-dialogo" id="btnExtraerOk">Extraer y guardar...</button>
+        <button class="btn-dialogo secundario" data-cerrar>Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diálogo dividir -->
+  <div id="dialogoDividir" class="dialogo-fondo oculto">
+    <div class="dialogo">
+      <div class="dialogo-titulo">Dividir PDF <button class="btn-cerrar" data-cerrar>&#10005;</button></div>
+      <div class="dialogo-cuerpo">
+        <p>Elige cómo dividir el documento en varios archivos:</p>
+        <label><input type="radio" name="modoDiv" value="cada" checked> Un archivo por página</label>
+        <label><input type="radio" name="modoDiv" value="rangos"> Por rangos personalizados</label>
+        <input id="rangosDiv" placeholder="Ej.: 1-3, 4-6, 7-10" spellcheck="false">
+      </div>
+      <div class="dialogo-pie">
+        <button class="btn-dialogo" id="btnDividirOk">Dividir y guardar...</button>
+        <button class="btn-dialogo secundario" data-cerrar>Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+  <script src="../../shared/cinta-responsive.js"></script>
+  <script src="../../shared/ia.js"></script>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Oficinar</title>
+  <link rel="stylesheet" href="estilos.css">
+  <link rel="stylesheet" href="../shared/ia.css">
+</head>
+<body>
+
+  <div class="fondo">
+    <div class="orbe o1"></div>
+    <div class="orbe o2"></div>
+    <div class="orbe o3"></div>
+    <div class="orbe o4"></div>
+  </div>
+
+  <header class="cabecera vidrio">
+    <img src="../recursos/logo.png" class="logo-principal" alt="Oficinar">
+    <div class="cabecera-texto">
+      <h1>Oficinar</h1>
+      <p>Tu suite de oficina con inteligencia artificial</p>
+    </div>
+    <button id="btnConfigIA" class="btn-vidrio" title="Configurar proveedores de IA">&#9881; Configurar IA</button>
+  </header>
+
+  <main class="tarjetas">
+    <div class="tarjeta vidrio" data-app="calcular">
+      <img src="../recursos/calcular.png" alt="Calcular">
+      <h2>Calcular</h2>
+      <p>Hojas de cálculo con más de 400 funciones, formatos y gráficos de datos.</p>
+      <span class="abrir">Abrir &#10148;</span>
+    </div>
+    <div class="tarjeta vidrio" data-app="escribir">
+      <img src="../recursos/escribir.png" alt="Escribir">
+      <h2>Escribir</h2>
+      <p>Procesador de texto con formato enriquecido, tablas, imágenes y exportación a PDF y Word.</p>
+      <span class="abrir">Abrir &#10148;</span>
+    </div>
+    <div class="tarjeta vidrio" data-app="presentar">
+      <img src="../recursos/presentar.png" alt="Presentar">
+      <h2>Presentar</h2>
+      <p>Presentaciones con diapositivas, formas, temas y modo de proyección a pantalla completa.</p>
+      <span class="abrir">Abrir &#10148;</span>
+    </div>
+    <div class="tarjeta vidrio" data-app="editarpdf">
+      <img src="../recursos/editarPDF.png" alt="Editar PDF">
+      <h2>Editar PDF</h2>
+      <p>Visualiza y edita PDF: texto, resaltado, dibujo, páginas, combinación y extracción.</p>
+      <span class="abrir">Abrir &#10148;</span>
+    </div>
+  </main>
+
+  <footer class="pie">
+    Oficinar 1.0 · ARTECH CLICK · Asistente IA: Claude, OpenAI, DeepSeek, Gemini, Groq, Kimi · IA local (Ollama, LM Studio) · Dictado por voz
+  </footer>
+
+  <script>
+    window.IA_APP = {
+      nombre: 'Oficinar (inicio)',
+      obtenerContexto: null,
+      insertar: null
+    };
+  </script>
+  <script src="../shared/ia.js"></script>
+  <script>
+    const { ipcRenderer } = require('electron');
+    document.querySelectorAll('.tarjeta').forEach(t => {
+      t.addEventListener('click', () => ipcRenderer.send('abrir-app', t.dataset.app));
+    });
+    document.getElementById('btnConfigIA').addEventListener('click', () => window.IA.abrirConfig());
+  </script>
+</body>
+</html>

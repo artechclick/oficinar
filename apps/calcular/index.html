@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Calcular</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="../../shared/ia.css">
+  <link rel="stylesheet" href="../../shared/responsive.css">
+</head>
+<body>
+
+  <!-- Cinta de opciones (estilo Excel) -->
+  <div id="cinta">
+    <div class="cinta-pestanas">
+      <span class="pestana activa" data-tab="inicio">Inicio</span>
+    </div>
+    <div class="cinta-contenido">
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <button class="btn" id="btnDeshacer" title="Deshacer (Ctrl+Z)">&#8630;</button>
+          <button class="btn" id="btnRehacer" title="Rehacer (Ctrl+Y)">&#8631;</button>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn" id="btnCortar" title="Cortar (Ctrl+X)">&#9986;</button>
+          <button class="btn" id="btnCopiar" title="Copiar (Ctrl+C)">&#10064;</button>
+          <button class="btn" id="btnPegar" title="Pegar (Ctrl+V)">&#128203;</button>
+          <button class="btn" id="btnPegadoEsp" title="Pegado especial (valores, fórmulas, formatos, transponer)">&#9660;</button>
+          <button class="btn" id="btnCopiarFormato" title="Copiar formato: copia el estilo de la selección y aplícalo en otro rango">&#128396;</button>
+        </div>
+        <div class="grupo-titulo">Portapapeles</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <select id="selFuente" title="Fuente">
+            <option>Calibri</option>
+            <option>Arial</option>
+            <option>Segoe UI</option>
+            <option>Times New Roman</option>
+            <option>Courier New</option>
+            <option>Verdana</option>
+            <option>Georgia</option>
+          </select>
+          <select id="selTamano" title="Tamaño de fuente">
+            <option>8</option><option>9</option><option>10</option><option selected>11</option>
+            <option>12</option><option>14</option><option>16</option><option>18</option>
+            <option>20</option><option>24</option><option>28</option><option>36</option><option>48</option>
+          </select>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn fmt" id="btnNegrita" title="Negrita (Ctrl+N)"><b>N</b></button>
+          <button class="btn fmt" id="btnCursiva" title="Cursiva (Ctrl+K)"><i>K</i></button>
+          <button class="btn fmt" id="btnSubrayado" title="Subrayado (Ctrl+S)"><u>S</u></button>
+          <button class="btn fmt" id="btnTachado" title="Tachado"><s>ab</s></button>
+          <span class="sep-v"></span>
+          <label class="btn color-btn" title="Color de fuente">
+            <span class="color-icono" id="iconoColorTexto">A</span>
+            <input type="color" id="colorTexto" value="#c00000">
+          </label>
+          <label class="btn color-btn" title="Color de relleno">
+            <span class="color-icono" id="iconoColorFondo">&#9639;</span>
+            <input type="color" id="colorFondo" value="#ffff00">
+          </label>
+          <button class="btn" id="btnBordes" title="Bordes">&#9707;</button>
+          <button class="btn" id="btnSinFormato" title="Borrar formato">&#9003;</button>
+        </div>
+        <div class="grupo-titulo">Fuente</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <button class="btn fmt" id="alignIzq" title="Alinear a la izquierda">&#8676;</button>
+          <button class="btn fmt" id="alignCentro" title="Centrar">&#8596;</button>
+          <button class="btn fmt" id="alignDer" title="Alinear a la derecha">&#8677;</button>
+          <span class="sep-v"></span>
+          <button class="btn fmt" id="vaSup" title="Alinear arriba">&#8963;</button>
+          <button class="btn fmt" id="vaMed" title="Alinear al medio">&#9552;</button>
+          <button class="btn fmt" id="vaInf" title="Alinear abajo">&#8964;</button>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn" id="btnAjustar" title="Ajustar texto (varias líneas)">&#8617;</button>
+          <button class="btn" id="btnOrientacion" title="Orientación del texto">&#10530;</button>
+          <button class="btn btn-texto" id="btnCombinar" title="Combinar celdas">&#9552;&#9552; Combinar &#9660;</button>
+        </div>
+        <div class="grupo-titulo">Alineación</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <select id="selFormato" title="Formato de número">
+            <option value="general">General</option>
+            <option value="numero">Número</option>
+            <option value="moneda">Moneda</option>
+            <option value="contabilidad">Contabilidad</option>
+            <option value="porcentaje">Porcentaje</option>
+            <option value="fecha">Fecha</option>
+            <option value="hora">Hora</option>
+            <option value="cientifico">Científico</option>
+            <option value="fraccion">Fracción</option>
+            <option value="texto">Texto</option>
+          </select>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn" id="btnMoneda" title="Formato de moneda">$</button>
+          <button class="btn" id="btnPorcentaje" title="Estilo porcentual">%</button>
+          <button class="btn" id="btnMiles" title="Estilo millares">000</button>
+          <button class="btn" id="btnMasDec" title="Aumentar decimales">&larr;,0</button>
+          <button class="btn" id="btnMenosDec" title="Disminuir decimales">,0&rarr;</button>
+        </div>
+        <div class="grupo-titulo">Número</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <button class="btn btn-texto" id="btnAutosuma" title="Autosuma (Alt+=)">&Sigma; Autosuma</button>
+          <button class="btn" id="btnAutosumaMas" title="Más funciones: promedio, contar, máx, mín">&#9660;</button>
+          <button class="btn btn-texto" id="btnFx" title="Insertar función (Shift+F3)">&fnof;x</button>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn" id="btnOrdenAZ" title="Ordenar de menor a mayor (A-Z)">A&darr;Z</button>
+          <button class="btn" id="btnOrdenZA" title="Ordenar de mayor a menor (Z-A)">Z&darr;A</button>
+          <button class="btn btn-texto" id="btnFiltro" title="Filtrar filas por criterio">&#9932; Filtro</button>
+          <button class="btn btn-texto" id="btnBorrarMenu" title="Borrar: todo, formatos o contenido">&#9003; Borrar &#9660;</button>
+        </div>
+        <div class="grupo-titulo">Edición</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <button class="btn btn-texto" id="btnFormatoCond" title="Formato condicional: reglas, escalas de color y barras de datos">&#127752; Formato condicional</button>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn btn-texto btn-ia" id="btnIA" title="Asistente IA (Ctrl+I)">&#10024; Asistente</button>
+        </div>
+        <div class="grupo-titulo">Estilos · IA</div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo-fila">
+          <button class="btn btn-texto" id="btnInsFila" title="Insertar fila">+ Fila</button>
+          <button class="btn btn-texto" id="btnInsCol" title="Insertar columna">+ Columna</button>
+          <button class="btn btn-texto" id="btnDimensiones" title="Alto de fila, ancho de columna, ocultar y mostrar">Formato &#9660;</button>
+        </div>
+        <div class="grupo-fila">
+          <button class="btn btn-texto" id="btnElimFila" title="Eliminar fila">&minus; Fila</button>
+          <button class="btn btn-texto" id="btnElimCol" title="Eliminar columna">&minus; Columna</button>
+        </div>
+        <div class="grupo-titulo">Celdas</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Barra de fórmulas -->
+  <div id="barraFormulas">
+    <input id="cuadroNombre" title="Cuadro de nombres" value="A1" spellcheck="false">
+    <span class="sep-v"></span>
+    <button class="btn-mini" id="btnCancelarEdicion" title="Cancelar">&#10005;</button>
+    <button class="btn-mini" id="btnAceptarEdicion" title="Introducir">&#10003;</button>
+    <button class="btn-mini" id="btnFx2" title="Insertar función">&fnof;x</button>
+    <span class="sep-v"></span>
+    <input id="entradaFormula" spellcheck="false" autocomplete="off">
+  </div>
+
+  <!-- Cuadrícula -->
+  <div id="areaGrid">
+    <div id="esquina"></div>
+    <div id="cabColumnas"><div id="cabColContenido"></div></div>
+    <div id="cabFilas"><div id="cabFilContenido"></div></div>
+    <div id="viewport">
+      <div id="sizer"></div>
+      <div id="celdas"></div>
+      <div id="seleccion"></div>
+      <div id="celdaActiva"></div>
+      <div id="asaRelleno"></div>
+      <input id="editor" spellcheck="false" autocomplete="off">
+    </div>
+  </div>
+
+  <!-- Pestañas de hojas -->
+  <div id="barraHojas">
+    <button class="btn-hoja" id="btnNuevaHoja" title="Nueva hoja (Shift+F11)">+</button>
+    <div id="pestanasHojas"></div>
+  </div>
+
+  <!-- Barra de estado -->
+  <div id="barraEstado">
+    <span id="estadoModo">Listo</span>
+    <span id="estadoStats"></span>
+  </div>
+
+  <!-- Menú contextual -->
+  <div id="menuContextual" class="oculto">
+    <div class="mc-item" data-accion="cortar">&#9986; Cortar</div>
+    <div class="mc-item" data-accion="copiar">&#10064; Copiar</div>
+    <div class="mc-item" data-accion="pegar">&#128203; Pegar</div>
+    <div class="mc-sep"></div>
+    <div class="mc-item" data-accion="insFilaArriba">Insertar fila arriba</div>
+    <div class="mc-item" data-accion="insFilaAbajo">Insertar fila abajo</div>
+    <div class="mc-item" data-accion="insColIzq">Insertar columna a la izquierda</div>
+    <div class="mc-item" data-accion="insColDer">Insertar columna a la derecha</div>
+    <div class="mc-sep"></div>
+    <div class="mc-item" data-accion="elimFilas">Eliminar filas</div>
+    <div class="mc-item" data-accion="elimCols">Eliminar columnas</div>
+    <div class="mc-sep"></div>
+    <div class="mc-item" data-accion="limpiarContenido">Borrar contenido</div>
+    <div class="mc-item" data-accion="limpiarFormato">Borrar formato</div>
+  </div>
+
+  <!-- Diálogo insertar función -->
+  <div id="dialogoFx" class="dialogo-fondo oculto">
+    <div class="dialogo">
+      <div class="dialogo-titulo">Insertar función <button class="btn-cerrar" id="cerrarFx">&#10005;</button></div>
+      <div class="dialogo-cuerpo">
+        <input id="buscarFx" placeholder="Buscar una función..." spellcheck="false">
+        <select id="categoriaFx">
+          <option value="">Todas las categorías</option>
+        </select>
+        <div id="listaFx"></div>
+        <div id="descFx"></div>
+      </div>
+      <div class="dialogo-pie">
+        <button class="btn-dialogo" id="aceptarFx">Aceptar</button>
+        <button class="btn-dialogo secundario" id="cancelarFx">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diálogo buscar -->
+  <div id="dialogoBuscar" class="dialogo-fondo oculto">
+    <div class="dialogo dialogo-chico">
+      <div class="dialogo-titulo">Buscar <button class="btn-cerrar" id="cerrarBuscar">&#10005;</button></div>
+      <div class="dialogo-cuerpo">
+        <input id="textoBuscar" placeholder="Texto a buscar..." spellcheck="false">
+        <input id="textoReemplazo" placeholder="Reemplazar con... (opcional)" spellcheck="false">
+        <div id="resultadoBuscar"></div>
+      </div>
+      <div class="dialogo-pie">
+        <button class="btn-dialogo" id="btnBuscarSig">Buscar siguiente</button>
+        <button class="btn-dialogo" id="btnReemplazarUno">Reemplazar</button>
+        <button class="btn-dialogo" id="btnReemplazarTodos">Reemplazar todo</button>
+        <button class="btn-dialogo secundario" id="btnCerrarBuscar2">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diálogo de bordes -->
+  <div id="dialogoBordes" class="dialogo-fondo oculto">
+    <div class="dialogo dialogo-chico">
+      <div class="dialogo-titulo">Bordes <button class="btn-cerrar" data-cerrar-b>&#10005;</button></div>
+      <div class="dialogo-cuerpo">
+        <div class="fila-form"><label>Estilo</label>
+          <select id="bordeEstilo">
+            <option value="solid">Sólido</option>
+            <option value="dashed">Punteado</option>
+            <option value="dotted">De puntos</option>
+            <option value="double">Doble</option>
+          </select>
+        </div>
+        <div class="fila-form"><label>Grosor</label>
+          <select id="bordeGrosor"><option value="1">Fino</option><option value="2">Medio</option><option value="3">Grueso</option></select>
+        </div>
+        <div class="fila-form"><label>Color</label>
+          <input type="color" id="bordeColor" value="#333333">
+        </div>
+        <div class="grupo-botones-borde">
+          <button class="btn-dialogo secundario" data-borde="todos">Todos</button>
+          <button class="btn-dialogo secundario" data-borde="externos">Externos</button>
+          <button class="btn-dialogo secundario" data-borde="internos">Internos</button>
+          <button class="btn-dialogo secundario" data-borde="gruesoExt">Contorno grueso</button>
+          <button class="btn-dialogo secundario" data-borde="t">Superior</button>
+          <button class="btn-dialogo secundario" data-borde="b">Inferior</button>
+          <button class="btn-dialogo secundario" data-borde="l">Izquierdo</button>
+          <button class="btn-dialogo secundario" data-borde="r">Derecho</button>
+          <button class="btn-dialogo secundario" data-borde="ninguno">Sin bordes</button>
+        </div>
+      </div>
+      <div class="dialogo-pie">
+        <button class="btn-dialogo secundario" data-cerrar-b>Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diálogo de formato condicional -->
+  <div id="dialogoCond" class="dialogo-fondo oculto">
+    <div class="dialogo">
+      <div class="dialogo-titulo">Formato condicional <button class="btn-cerrar" data-cerrar-c>&#10005;</button></div>
+      <div class="dialogo-cuerpo">
+        <div class="fila-form"><label>Regla</label>
+          <select id="condTipo">
+            <option value="mayor">Mayor que</option>
+            <option value="menor">Menor que</option>
+            <option value="igual">Igual a</option>
+            <option value="contiene">El texto contiene</option>
+            <option value="duplicados">Valores duplicados</option>
+            <option value="escala">Escala de color (mapa de calor)</option>
+            <option value="barras">Barras de datos</option>
+          </select>
+        </div>
+        <div class="fila-form" id="condFilaValor"><label>Valor</label>
+          <input id="condValor" placeholder="Ej.: 100" spellcheck="false">
+        </div>
+        <div class="fila-form"><label>Color</label>
+          <input type="color" id="condColor" value="#63be7b">
+        </div>
+        <div class="fila-form"><button class="btn-dialogo" id="btnAgregarCond">Agregar regla al rango seleccionado</button></div>
+        <div class="mf-titulo">Reglas de esta hoja</div>
+        <div id="listaCond"></div>
+      </div>
+      <div class="dialogo-pie">
+        <button class="btn-dialogo secundario" data-cerrar-c>Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diálogo de dimensiones -->
+  <div id="dialogoDim" class="dialogo-fondo oculto">
+    <div class="dialogo dialogo-chico">
+      <div class="dialogo-titulo">Dimensiones <button class="btn-cerrar" data-cerrar-d>&#10005;</button></div>
+      <div class="dialogo-cuerpo">
+        <div class="fila-form"><label>Alto de fila</label><input type="number" id="dimAlto" min="12" max="400" value="24"> px</div>
+        <div class="fila-form"><label>Ancho columna</label><input type="number" id="dimAncho" min="20" max="600" value="100"> px</div>
+      </div>
+      <div class="dialogo-pie">
+        <button class="btn-dialogo" id="btnDimAplicar">Aplicar</button>
+        <button class="btn-dialogo secundario" id="btnDimAutoajuste">Autoajustar</button>
+        <button class="btn-dialogo secundario" data-cerrar-d>Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="funciones.js"></script>
+  <script src="renderer.js"></script>
+  <script src="../../shared/fuentes.js"></script>
+  <script src="mejoras.js"></script>
+  <script src="ia-app.js"></script>
+  <script src="../../shared/cinta-responsive.js"></script>
+  <script src="../../shared/ia.js"></script>
+</body>
+</html>

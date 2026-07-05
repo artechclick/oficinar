@@ -1,0 +1,95 @@
+/* ===== Oficinar - Launcher (crystal glass) ===== */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100%; overflow: hidden;
+  font-family: "Segoe UI", Calibri, Arial, sans-serif;
+  color: #1d2433; user-select: none;
+}
+
+body {
+  display: flex; flex-direction: column;
+  background: linear-gradient(135deg, #eef1f7 0%, #e7ecfa 45%, #f3eef8 100%);
+}
+
+/* Orbes de color difuminados detrás del vidrio */
+.fondo { position: fixed; inset: 0; z-index: 0; overflow: hidden; }
+.orbe { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .55; }
+.o1 { width: 480px; height: 480px; background: #7ec8ff; top: -140px; left: -120px; }
+.o2 { width: 420px; height: 420px; background: #ffb37e; bottom: -160px; left: 22%; }
+.o3 { width: 460px; height: 460px; background: #b0ffc8; top: 6%; right: -140px; }
+.o4 { width: 400px; height: 400px; background: #ff9ed2; bottom: -120px; right: 16%; }
+
+.vidrio {
+  background: linear-gradient(160deg, rgba(255,255,255,.62), rgba(255,255,255,.34));
+  backdrop-filter: blur(26px) saturate(1.5);
+  -webkit-backdrop-filter: blur(26px) saturate(1.5);
+  border: 1px solid rgba(255,255,255,.75);
+  box-shadow: 0 10px 36px rgba(40, 60, 110, .14), inset 0 1px 0 rgba(255,255,255,.9);
+  border-radius: 22px;
+}
+
+/* ===== Cabecera ===== */
+.cabecera {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; gap: 18px;
+  margin: 26px 34px 8px 34px; padding: 16px 24px;
+}
+.logo-principal {
+  width: 92px; height: 92px; object-fit: contain;
+  /* El logo es un anillo de vidrio con transparencia real: va directo sobre el fondo */
+  filter: drop-shadow(0 8px 20px rgba(90, 70, 160, .38));
+}
+.cabecera-texto { flex: 1; }
+.cabecera h1 {
+  font-size: 34px; font-weight: 700; letter-spacing: .5px;
+  background: linear-gradient(90deg, #3b82d8, #7a6cff, #e05fa8, #ef8f3c);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.cabecera p { color: #556180; font-size: 14px; margin-top: 2px; }
+
+.btn-vidrio {
+  padding: 10px 18px; border-radius: 14px; cursor: pointer; font-size: 13px;
+  border: 1px solid rgba(255,255,255,.8); color: #3a4763;
+  background: linear-gradient(160deg, rgba(255,255,255,.75), rgba(255,255,255,.45));
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 16px rgba(40, 60, 110, .12);
+  transition: transform .15s, box-shadow .15s;
+}
+.btn-vidrio:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(40, 60, 110, .2); }
+
+/* ===== Tarjetas ===== */
+.tarjetas {
+  position: relative; z-index: 1; flex: 1;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 22px; padding: 22px 34px; align-content: center;
+  overflow-y: auto;
+}
+.tarjeta {
+  padding: 26px 22px 20px 22px; text-align: center; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  transition: transform .18s cubic-bezier(.34,1.4,.6,1), box-shadow .18s;
+}
+.tarjeta:hover {
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: 0 18px 46px rgba(40, 60, 110, .22), inset 0 1px 0 rgba(255,255,255,.95);
+}
+.tarjeta img {
+  width: 108px; height: 108px; object-fit: contain;
+  filter: drop-shadow(0 10px 20px rgba(60, 80, 150, .30));
+  transition: transform .18s;
+}
+.tarjeta:hover img { transform: scale(1.07); }
+.tarjeta h2 { font-size: 19px; font-weight: 650; color: #253052; }
+.tarjeta p { font-size: 12.5px; color: #556180; line-height: 1.5; min-height: 55px; }
+.abrir {
+  margin-top: 4px; font-size: 12.5px; font-weight: 600; color: #4a3fa8;
+  opacity: 0; transform: translateY(4px); transition: all .18s;
+}
+.tarjeta:hover .abrir { opacity: 1; transform: translateY(0); }
+
+/* ===== Pie ===== */
+.pie {
+  position: relative; z-index: 1; text-align: center;
+  padding: 10px; font-size: 11.5px; color: #6a7692;
+}
