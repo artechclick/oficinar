@@ -50,10 +50,10 @@
       "shortcutName": "Oficinar"
     },
     "appx": {
-      "applicationId": "Oficinar",
-      "identityName": "ARTECHCLICK.Oficinar",
-      "publisher": "CN=ARTECH CLICK",
-      "publisherDisplayName": "ARTECH CLICK",
+      "applicationId": "ArtechClick.Oficinar",
+      "identityName": "ArtechClick.Oficinar",
+      "publisher": "CN=217692EE-5B79-4ED6-A1F6-BA0D38A99632",
+      "publisherDisplayName": "Artech Click",
       "displayName": "Oficinar",
       "backgroundColor": "#1a1030",
       "showNameOnTiles": true,
