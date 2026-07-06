@@ -331,13 +331,36 @@ function aplicarTamano(pt) {
   const p = paginaActiva();
   if (p) p.focus({ preventScroll: true });
   restaurarRango();
+  // Desactivar styleWithCSS solo aquí: así fontSize genera <font size="7"> (convertible a puntos).
+  // Con styleWithCSS activo produciría font-size:xxx-large y el tamaño quedaría siempre enorme.
+  document.execCommand('styleWithCSS', false, false);
   document.execCommand('fontSize', false, '7');
+  document.execCommand('styleWithCSS', false, true);
+  const nuevos = [];
   marco.querySelectorAll('font[size="7"]').forEach(f => {
     const span = document.createElement('span');
     span.style.fontSize = pt + 'pt';
     while (f.firstChild) span.appendChild(f.firstChild);
     f.replaceWith(span);
+    // Quitar el tamaño de fuente de los elementos internos: si no, un <span> anidado
+    // con un tamaño previo (p.ej. 48pt) ganaría y no se podría reducir el texto.
+    span.querySelectorAll('[style*="font-size"], font[size]').forEach(el => {
+      if (el.style) el.style.fontSize = '';
+      if (el.tagName === 'FONT') el.removeAttribute('size');
+      if (el.getAttribute && !el.getAttribute('style')) el.removeAttribute('style');
+    });
+    nuevos.push(span);
   });
+  // Reponer la selección sobre el contenido modificado para permitir cambios de tamaño
+  // consecutivos (si no, tras modificar el DOM se pierde la selección y el 2.º cambio no aplica).
+  if (nuevos.length) {
+    const sel = window.getSelection();
+    const r = document.createRange();
+    r.setStartBefore(nuevos[0]);
+    r.setEndAfter(nuevos[nuevos.length - 1]);
+    sel.removeAllRanges(); sel.addRange(r);
+    guardarRango();
+  }
   marcarModificado();
   repaginarPronto();
 }

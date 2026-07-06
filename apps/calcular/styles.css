@@ -112,6 +112,7 @@ select { height: 24px; border: 1px solid var(--gris-borde); background: #fff; bo
 .cab-fila { width: 46px; cursor: default; }
 
 .redim-col { position: absolute; top: 0; width: 5px; height: var(--alto-fila); cursor: col-resize; z-index: 7; }
+.redim-fila { position: absolute; left: 0; height: 5px; cursor: row-resize; z-index: 7; }
 
 #viewport { grid-area: 2 / 2; overflow: auto; position: relative; background: #fff; }
 #sizer { position: absolute; top: 0; left: 0; width: 1px; height: 1px; }

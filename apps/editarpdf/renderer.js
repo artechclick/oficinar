@@ -307,19 +307,32 @@ function marcarMiniActiva() {
 // ---------- Interacción con el overlay ----------
 function conectarOverlay(ov, iPag) {
   ov.addEventListener('mousedown', (e) => {
+    // Si se está editando un texto (contenteditable), dejar que el navegador coloque el cursor
+    if (e.target.isContentEditable) return;
     const p = paginas[iPag];
     const r = ov.getBoundingClientRect();
     const vx = e.clientX - r.left, vy = e.clientY - r.top;
     paginaActual = iPag;
 
     if (herramienta === 'texto') {
+      // Si se hace clic sobre un texto ya existente, editarlo en vez de crear otro
+      const existente = e.target.closest('.anot.texto');
+      if (existente && existente.dataset.idx !== undefined) {
+        editarTextoAnot(iPag, parseInt(existente.dataset.idx, 10));
+        e.preventDefault();
+        return;
+      }
       const [x, y] = aPDF(p, vx, vy);
       const texto = { tipo: 'texto', x, y, texto: 'Texto', tam: parseInt($('selTamanoTexto').value, 10), color: $('colorAnot').value };
       p.anot.push(texto);
-      anotSel = { pag: iPag, idx: p.anot.length - 1 };
+      const idx = p.anot.length - 1;
+      anotSel = { pag: iPag, idx };
+      // Cambiar a la herramienta de mover: así el cuadro se puede editar, mover y no se crean más al hacer clic
+      fijarHerramienta('mover');
       renderizarAnotaciones(iPag);
-      editarTextoAnot(iPag, p.anot.length - 1);
+      editarTextoAnot(iPag, idx, true);
       marcarModificado();
+      e.preventDefault();
       return;
     }
 
@@ -331,10 +344,13 @@ function conectarOverlay(ov, iPag) {
       if (!item) return;
       p.anot.push({ tipo: 'blanqueo', x: item.x - 1.5, y: item.y - item.alto * 0.28, w: item.w + 3, h: item.alto * 1.42 });
       p.anot.push({ tipo: 'texto', x: item.x, y: item.y + item.alto, texto: item.str, tam: Math.round(item.alto), color: '#000000' });
-      anotSel = { pag: iPag, idx: p.anot.length - 1 };
+      const idx = p.anot.length - 1;
+      anotSel = { pag: iPag, idx };
+      fijarHerramienta('mover');
       renderizarAnotaciones(iPag);
-      editarTextoAnot(iPag, p.anot.length - 1);
+      editarTextoAnot(iPag, idx, true);
       marcarModificado();
+      e.preventDefault();
       return;
     }
 
@@ -455,14 +471,21 @@ document.addEventListener('mouseup', () => {
   }
 });
 
-function editarTextoAnot(iPag, idx) {
+function editarTextoAnot(iPag, idx, seleccionarTodo) {
   const p = paginas[iPag];
-  renderizarAnotaciones(iPag);
   const el = p._overlay.querySelector(`.anot.texto[data-idx="${idx}"]`);
   if (!el) return;
   el.contentEditable = 'true';
-  el.focus();
-  document.execCommand('selectAll');
+  // Enfocar tras el ciclo del evento actual para que el foco no lo robe el mousedown
+  requestAnimationFrame(() => {
+    el.focus();
+    const sel = window.getSelection();
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    if (!seleccionarTodo) r.collapse(false); // cursor al final
+    sel.removeAllRanges();
+    sel.addRange(r);
+  });
   const terminar = () => {
     el.contentEditable = 'false';
     const a = p.anot[idx];
@@ -474,7 +497,7 @@ function editarTextoAnot(iPag, idx) {
     marcarModificado();
   };
   el.addEventListener('blur', terminar, { once: true });
-  el.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') el.blur(); });
+  el.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') { ev.preventDefault(); el.blur(); } ev.stopPropagation(); });
 }
 
 // Editar el contenido de una nota adhesiva en un globo flotante

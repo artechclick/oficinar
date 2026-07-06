@@ -118,9 +118,63 @@ function anchoCol(c) { return meta().anchos[c] || ANCHO_COL_DEF; }
 function altoFila(r) {
   const m = meta();
   if (m.ocultas[r]) return 0;
-  return m.altos[r] || ALTO_FILA;
+  if (m.altos[r]) return m.altos[r];                 // alto fijado manualmente
+  if (m.autoAltos && m.autoAltos[r]) return m.autoAltos[r]; // alto automático (fuente/ajuste)
+  return ALTO_FILA;
 }
 const offY = (r) => offsetsFila[Math.max(0, Math.min(FILAS, r))];
+
+// ---------- Alto de fila dinámico (según tamaño de fuente y ajuste de texto) ----------
+const _ctxMedir = document.createElement('canvas').getContext('2d');
+function medirAltoCelda(r, c) {
+  const est = getEstilo(r, c) || {};
+  const fs = est.fs || 13;
+  const base = Math.max(ALTO_FILA, Math.ceil(fs * 1.5) + 4);
+  if (!est.wrap) return base;
+  const info = textoCelda(r, c);
+  const texto = info.texto;
+  if (!texto) return base;
+  _ctxMedir.font = `${est.b ? 'bold ' : ''}${fs}px ${est.ff || 'Calibri'}`;
+  const anchoDisp = Math.max(20, anchoCol(c) - 8);
+  let lineas = 0;
+  for (const parrafo of texto.split('\n')) {
+    if (!parrafo) { lineas++; continue; }
+    const palabras = parrafo.split(/\s+/);
+    let linea = '', n = 1;
+    for (const p of palabras) {
+      const test = linea ? linea + ' ' + p : p;
+      if (_ctxMedir.measureText(test).width > anchoDisp && linea) { n++; linea = p; }
+      else linea = test;
+    }
+    lineas += n;
+  }
+  return Math.max(base, Math.ceil(lineas * fs * 1.35) + 6);
+}
+// Recalcula los altos automáticos solo de las filas con celdas de fuente grande o ajuste
+function recalcularAltosAuto() {
+  const m = meta();
+  m.autoAltos = {};
+  const filas = new Set();
+  for (const [k, est] of m.estilos) {
+    if (est && (est.fs > 13 || est.wrap)) filas.add(parseInt(k.split(',')[0], 10));
+  }
+  if (!filas.size) return;
+  let dims; try { dims = hf.getSheetDimensions(hojaActual); } catch (e) { dims = { width: COLS }; }
+  const maxC = Math.min(dims.width + 1, COLS);
+  for (const r of filas) {
+    let alto = ALTO_FILA;
+    for (let c = 0; c < maxC; c++) {
+      const est = getEstilo(r, c);
+      if (est && (est.fs > 13 || est.wrap)) alto = Math.max(alto, medirAltoCelda(r, c));
+    }
+    if (alto > ALTO_FILA) m.autoAltos[r] = alto;
+  }
+}
+// Recalcula alto automático + offsets de una vez
+function actualizarGeometria() {
+  recalcularAltosAuto();
+  recalcularOffsets();
+}
 
 function recalcularOffsets() {
   offsetsCol = new Array(COLS + 1);
@@ -424,6 +478,7 @@ function render() {
     if (!hFila) continue;
     const enSel = r >= n.r1 && r <= n.r2;
     hfil += `<div class="cab-fila${enSel ? ' sel' : ''}" style="top:${offY(r)}px;height:${hFila}px;width:${ANCHO_CAB_FILA}px" data-r="${r}">${r + 1}</div>`;
+    hfil += `<div class="redim-fila" style="top:${offY(r + 1) - 3}px;width:${ANCHO_CAB_FILA}px" data-r="${r}"></div>`;
   }
   cabFilCont.innerHTML = hfil;
   cabFilCont.style.transform = `translateY(${-st}px)`;
@@ -578,6 +633,9 @@ function confirmarEdicion(mover) {
   const texto = editando ? editor.value : entradaFormula.value;
   cerrarEditor();
   aplicarValor(activa.r, activa.c, texto);
+  // El texto nuevo puede cambiar el número de líneas ajustadas → recalcular alto
+  const est = getEstilo(activa.r, activa.c);
+  if (est && est.wrap) actualizarGeometria();
   if (mover === 'abajo') moverActiva(1, 0, false);
   else if (mover === 'arriba') moverActiva(-1, 0, false);
   else if (mover === 'derecha') moverActiva(0, 1, false);
@@ -838,6 +896,7 @@ window.addEventListener('resize', () => render());
 
 // ---------- Cabeceras: selección de filas/columnas y redimensionar ----------
 let redimCol = null;
+let redimFila = null;
 
 $('cabColumnas').addEventListener('mousedown', (e) => {
   const t = e.target;
@@ -872,16 +931,36 @@ window.addEventListener('mousemove', (e) => {
   if (redimCol) {
     meta().anchos[redimCol.c] = Math.max(28, redimCol.w0 + e.clientX - redimCol.x0);
     recalcularOffsets(); render();
+  } else if (redimFila) {
+    meta().altos[redimFila.r] = Math.max(14, redimFila.h0 + e.clientY - redimFila.y0);
+    recalcularOffsets(); render();
   }
 });
-window.addEventListener('mouseup', () => { if (redimCol) { redimCol = null; marcarModificado(); } });
+window.addEventListener('mouseup', () => {
+  if (redimCol) { redimCol = null; marcarModificado(); }
+  if (redimFila) { redimFila = null; marcarModificado(); }
+});
 
 $('cabFilas').addEventListener('mousedown', (e) => {
-  if (!e.target.classList.contains('cab-fila')) return;
-  const r = parseInt(e.target.dataset.r, 10);
+  const t = e.target;
+  if (t.classList.contains('redim-fila')) {
+    const r = parseInt(t.dataset.r, 10);
+    redimFila = { r, y0: e.clientY, h0: altoFila(r) };
+    e.preventDefault();
+    return;
+  }
+  if (!t.classList.contains('cab-fila')) return;
+  const r = parseInt(t.dataset.r, 10);
   sel = { r1: r, c1: 0, r2: r, c2: COLS - 1 };
   activa = { r, c: 0 }; ancla = { r, c: 0 };
   render();
+});
+// Doble clic en el borde de la fila: autoajustar alto al contenido
+$('cabFilas').addEventListener('dblclick', (e) => {
+  if (!e.target.classList.contains('redim-fila')) return;
+  const r = parseInt(e.target.dataset.r, 10);
+  delete meta().altos[r]; // volver a alto automático
+  actualizarGeometria(); render(); marcarModificado();
 });
 $('esquina').addEventListener('mousedown', () => {
   sel = { r1: 0, c1: 0, r2: FILAS - 1, c2: COLS - 1 };
@@ -964,6 +1043,8 @@ function aplicarEstiloSel(cambios) {
   for (let r = n.r1; r <= r2; r++)
     for (let c = n.c1; c <= c2; c++) setEstilo(r, c, cambios);
   marcarModificado();
+  // Si el cambio puede afectar el alto (tamaño de fuente o ajuste), recalcular geometría
+  if (cambios && ('fs' in cambios || 'wrap' in cambios || 'ff' in cambios || 'b' in cambios)) actualizarGeometria();
   render();
   viewport.focus();
 }
@@ -1462,7 +1543,7 @@ function cargarLibro(json) {
   const act = doc.hojaActiva && hf.getSheetId(doc.hojaActiva) !== undefined ? hf.getSheetId(doc.hojaActiva) : hf.getSheetId(hf.getSheetNames()[0]);
   hojaActual = act;
   seleccionar(0, 0, false);
-  recalcularOffsets(); render(); renderHojas();
+  actualizarGeometria(); render(); renderHojas();
 }
 
 async function accionNuevo() {
