@@ -1497,10 +1497,11 @@ $('btnCerrarBuscar2').onclick = () => cerrarDialogos();
 // ---------- Archivos ----------
 const FILTRO_CALC = [{ name: 'Libro de Calcular', extensions: ['calc'] }];
 const FILTRO_TODOS = [
-  { name: 'Todos los compatibles', extensions: ['calc', 'xlsx', 'csv'] },
+  { name: 'Todas las hojas de cálculo', extensions: ['calc', 'xlsx', 'xlsm', 'xls', 'ods', 'xlsb', 'csv', 'tsv', 'txt'] },
   { name: 'Libro de Calcular', extensions: ['calc'] },
-  { name: 'Libro de Excel', extensions: ['xlsx'] },
-  { name: 'CSV', extensions: ['csv'] }
+  { name: 'Excel (xlsx, xlsm, xls, xlsb)', extensions: ['xlsx', 'xlsm', 'xls', 'xlsb'] },
+  { name: 'OpenDocument (ods)', extensions: ['ods'] },
+  { name: 'CSV / texto', extensions: ['csv', 'tsv', 'txt'] }
 ];
 
 function serializarLibro() {
@@ -1577,11 +1578,14 @@ async function abrirRuta(ruta) {
     if (ext === '.calc') {
       cargarLibro(fs.readFileSync(ruta, 'utf8'));
       archivoActual = ruta;
-    } else if (ext === '.csv') {
+    } else if (ext === '.csv' || ext === '.tsv' || ext === '.txt') {
       importarCSVRuta(ruta);
       archivoActual = null;
-    } else if (ext === '.xlsx') {
-      await importarXLSX(ruta);
+    } else if (ext === '.xlsx' || ext === '.xlsm') {
+      await importarXLSX(ruta);   // ExcelJS: valores + estilos
+      archivoActual = null;
+    } else if (ext === '.xls' || ext === '.ods' || ext === '.xlsb') {
+      importarSheetJS(ruta);      // SheetJS: abre formatos heredados (valores)
       archivoActual = null;
     } else {
       alert('Formato no compatible: ' + ext);
@@ -1593,6 +1597,31 @@ async function abrirRuta(ruta) {
   } catch (e) {
     alert('No se pudo abrir el archivo:\n' + e.message);
   }
+}
+
+// Importa .xls / .ods / .xlsb con SheetJS (valores; estos formatos no traen estilos aquí)
+function importarSheetJS(ruta) {
+  const XLSX = require('xlsx');
+  const wb = XLSX.readFile(ruta, { cellDates: true });
+  const hojas = {};
+  for (const nombre of wb.SheetNames) {
+    const ws = wb.Sheets[nombre];
+    const filas = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: true });
+    hojas[nombre] = filas.map(fila => (fila || []).map(v => {
+      if (v === null || v === undefined) return null;
+      if (v instanceof Date) {
+        const dd = String(v.getDate()).padStart(2, '0'), mm = String(v.getMonth() + 1).padStart(2, '0');
+        return `${dd}/${mm}/${v.getFullYear()}`;
+      }
+      return (typeof v === 'number') ? v : String(v);
+    }));
+  }
+  if (!Object.keys(hojas).length) throw new Error('El archivo no contiene hojas.');
+  crearHF(hojas);
+  metaHojas = {};
+  invalidarCacheCond();
+  seleccionar(0, 0, false);
+  actualizarGeometria(); render(); renderHojas();
 }
 
 async function accionGuardar() {
@@ -1688,46 +1717,170 @@ async function accionExportarCSV() {
 }
 
 // --- XLSX (valores) ---
+// Convierte un color de ExcelJS ({argb} / {theme,tint} / {indexed}) a #RRGGBB
+const COLORES_INDEXADOS = { 0: '000000', 1: 'FFFFFF', 2: 'FF0000', 3: '00FF00', 4: '0000FF', 5: 'FFFF00', 6: 'FF00FF', 7: '00FFFF', 8: '000000', 9: 'FFFFFF', 64: '000000' };
+const TEMA_BASE = ['FFFFFF', '000000', 'E7E6E6', '44546A', '4472C4', 'ED7D31', 'A5A5A5', 'FFC000', '5B9BD5', '70AD47'];
+function colorExcelAHex(col) {
+  if (!col) return null;
+  if (col.argb && /^[0-9A-Fa-f]{8}$/.test(col.argb)) return '#' + col.argb.slice(2);
+  if (col.argb && /^[0-9A-Fa-f]{6}$/.test(col.argb)) return '#' + col.argb;
+  if (col.theme !== undefined) {
+    let hex = TEMA_BASE[col.theme] || '000000';
+    if (col.tint) hex = aplicarTinte(hex, col.tint);
+    return '#' + hex;
+  }
+  if (col.indexed !== undefined && COLORES_INDEXADOS[col.indexed]) return '#' + COLORES_INDEXADOS[col.indexed];
+  return null;
+}
+function aplicarTinte(hex, tint) {
+  const n = parseInt(hex, 16);
+  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const ap = (v) => tint < 0 ? Math.round(v * (1 + tint)) : Math.round(v + (255 - v) * tint);
+  r = ap(r); g = ap(g); b = ap(b);
+  return [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+// Traduce el formato de número de Excel al de la app
+function formatoExcelApp(numFmt) {
+  if (!numFmt || /^general$/i.test(numFmt)) return null;
+  const f = numFmt.toLowerCase();
+  const dec = (numFmt.match(/\.(0+)/) || [null, ''])[1].length;
+  if (/%/.test(f)) return { fmt: 'porcentaje', dec };
+  if (/[$€£]|"\$"|usd|cop/.test(f)) return { fmt: /\(/.test(f) ? 'contabilidad' : 'moneda', dec };
+  if (/[dmy]/.test(f) && /[dy]/.test(f)) return { fmt: 'fecha' };
+  if (/h[h]?:mm/.test(f)) return { fmt: 'hora' };
+  if (/e\+/.test(f)) return { fmt: 'cientifico', dec };
+  if (/\?\/\?/.test(f)) return { fmt: 'fraccion' };
+  if (/[0#]/.test(f)) return { fmt: 'numero', dec };
+  return null;
+}
+function bordeExcelApp(b) {
+  if (!b || !b.style || b.style === 'none') return null;
+  const grosor = /thick|medium|double/.test(b.style) ? (b.style === 'double' ? 3 : 2) : 1;
+  const estilo = b.style === 'double' ? 'double' : /dash|dot/.test(b.style) ? 'dashed' : 'solid';
+  const color = (b.color && colorExcelAHex(b.color)) || '#000000';
+  return `${grosor}px ${estilo} ${color}`;
+}
+
 async function importarXLSX(ruta) {
   const ExcelJS = require('exceljs');
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.readFile(ruta);
   const hojas = {};
+  const metaImport = {};   // nombre -> { estilos, anchos, altos, combinadas }
+
   wb.eachSheet((ws) => {
     const matriz = [];
+    const estilos = new Map();
+    const anchos = {}, altos = {}, combinadas = [];
+
     ws.eachRow({ includeEmpty: true }, (fila, numFila) => {
+      const r = numFila - 1;
       const filaArr = [];
       fila.eachCell({ includeEmpty: true }, (celda, numCol) => {
+        const c = numCol - 1;
+        // ---- Valor ----
         let v = celda.value;
-        if (v === null || v === undefined) { filaArr[numCol - 1] = null; return; }
-        if (typeof v === 'object') {
-          if (v.result !== undefined) v = v.result;           // fórmula -> resultado
-          else if (v.richText) v = v.richText.map(t => t.text).join('');
-          else if (v.text !== undefined) v = v.text;          // hipervínculo
-          else if (v.error) { filaArr[numCol - 1] = null; return; }
+        if (v !== null && v !== undefined) {
+          if (typeof v === 'object') {
+            if (v.formula !== undefined && v.result !== undefined) v = v.result;
+            else if (v.result !== undefined) v = v.result;
+            else if (v.richText) v = v.richText.map(t => t.text).join('');
+            else if (v.text !== undefined) v = v.text;
+            else if (v.error) v = null;
+            else if (!(v instanceof Date)) v = null;
+          }
+          if (v instanceof Date) {
+            const dd = String(v.getUTCDate()).padStart(2, '0');
+            const mm = String(v.getUTCMonth() + 1).padStart(2, '0');
+            v = `${dd}/${mm}/${v.getUTCFullYear()}`;
+          }
+          filaArr[c] = (typeof v === 'number') ? v : (v === null ? null : String(v));
+        } else filaArr[c] = null;
+
+        // ---- Estilo ----
+        const est = {};
+        const fnt = celda.font;
+        if (fnt) {
+          if (fnt.bold) est.b = 1;
+          if (fnt.italic) est.i = 1;
+          if (fnt.underline) est.u = 1;
+          if (fnt.strike) est.st = 1;
+          if (fnt.name) est.ff = fnt.name;
+          if (fnt.size && fnt.size !== 11) est.fs = Math.round(fnt.size * 96 / 72);
+          const cc = colorExcelAHex(fnt.color);
+          if (cc && cc !== '#000000') est.c = cc;
         }
-        if (v instanceof Date) {
-          const dd = String(v.getUTCDate()).padStart(2, '0');
-          const mm = String(v.getUTCMonth() + 1).padStart(2, '0');
-          v = `${dd}/${mm}/${v.getUTCFullYear()}`;
+        const fill = celda.fill;
+        if (fill && fill.type === 'pattern' && fill.pattern !== 'none') {
+          const bg = colorExcelAHex(fill.fgColor);
+          if (bg && bg !== '#FFFFFF' && bg.toUpperCase() !== '#FFFFFF') est.bg = bg;
         }
-        if (typeof v === 'number') filaArr[numCol - 1] = v;
-        else filaArr[numCol - 1] = String(v);
+        const al = celda.alignment;
+        if (al) {
+          if (al.horizontal && ['left', 'center', 'right'].includes(al.horizontal)) est.al = al.horizontal;
+          if (al.vertical === 'top' || al.vertical === 'middle' || al.vertical === 'bottom') est.va = al.vertical;
+          if (al.wrapText) est.wrap = 1;
+          if (al.textRotation === 90) est.rot = 'vert';
+          else if (al.textRotation === 45) est.rot = 'asc';
+          else if (al.textRotation === -45 || al.textRotation === 135) est.rot = 'desc';
+        }
+        const bd = celda.border;
+        if (bd) {
+          const bordes = {};
+          const t = bordeExcelApp(bd.top), b = bordeExcelApp(bd.bottom), l = bordeExcelApp(bd.left), rr = bordeExcelApp(bd.right);
+          if (t) bordes.t = t; if (b) bordes.b = b; if (l) bordes.l = l; if (rr) bordes.r = rr;
+          if (Object.keys(bordes).length) est.bordes = bordes;
+        }
+        const nf = formatoExcelApp(celda.numFmt);
+        if (nf) { est.fmt = nf.fmt; if (nf.dec !== undefined && nf.dec !== '') est.dec = nf.dec; }
+
+        if (Object.keys(est).length) estilos.set(r + ',' + c, est);
       });
-      matriz[numFila - 1] = filaArr;
+      matriz[r] = filaArr;
+      if (fila.height) altos[r] = Math.round(fila.height * 96 / 72);
     });
-    // normalizar huecos (filas y celdas sin valor)
+
+    // Anchos de columna (unidad Excel ≈ 7px por carácter + 5)
+    if (ws.columns) ws.columns.forEach((col, i) => { if (col && col.width) anchos[i] = Math.round(col.width * 7 + 5); });
+
+    // Celdas combinadas
+    const merges = ws._merges || (ws.model && ws.model.merges) || {};
+    const listaMerges = Array.isArray(merges) ? merges : Object.values(merges).map(m => m.range || m);
+    for (const m of listaMerges) {
+      const rango = typeof m === 'string' ? m : (m && m.range);
+      if (!rango) continue;
+      const mm = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(rango);
+      if (!mm) continue;
+      const c1 = colLetraANum(mm[1]), r1 = parseInt(mm[2], 10) - 1, c2 = colLetraANum(mm[3]), r2 = parseInt(mm[4], 10) - 1;
+      combinadas.push({ r1: Math.min(r1, r2), c1: Math.min(c1, c2), r2: Math.max(r1, r2), c2: Math.max(c1, c2) });
+    }
+
     for (let i = 0; i < matriz.length; i++) {
       if (!matriz[i]) { matriz[i] = []; continue; }
       for (let j = 0; j < matriz[i].length; j++) if (matriz[i][j] === undefined) matriz[i][j] = null;
     }
     hojas[ws.name] = matriz;
+    metaImport[ws.name] = { estilos, anchos, altos, combinadas };
   });
+
   if (!Object.keys(hojas).length) throw new Error('El archivo no contiene hojas.');
   crearHF(hojas);
   metaHojas = {};
+  for (const nombre of Object.keys(metaImport)) {
+    const id = hf.getSheetId(nombre);
+    if (id === undefined) continue;
+    const mi = metaImport[nombre];
+    metaHojas[id] = { estilos: mi.estilos, anchos: mi.anchos, altos: mi.altos, ocultas: {}, combinadas: mi.combinadas, condicionales: {} , autoAltos: {} };
+    metaHojas[id].condicionales = [];
+  }
+  invalidarCacheCond();
   seleccionar(0, 0, false);
-  recalcularOffsets(); render(); renderHojas();
+  actualizarGeometria(); render(); renderHojas();
+}
+function colLetraANum(letras) {
+  let n = 0;
+  for (const ch of letras.toUpperCase()) n = n * 26 + (ch.charCodeAt(0) - 64);
+  return n - 1;
 }
 async function exportarXLSX(ruta) {
   const ExcelJS = require('exceljs');

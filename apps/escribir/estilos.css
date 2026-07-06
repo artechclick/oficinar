@@ -161,8 +161,13 @@ select { height: 24px; border: 1px solid var(--gris-borde); background: rgba(255
 .pagina th, .pagina td { border: 1px solid #9db3d0; padding: 5px 9px; min-width: 30px; }
 .pagina th { background: #e4ecf7; }
 .pagina .salto-pagina {
-  border: none; border-top: 2px dashed #b8c6de; margin: 24px -40px;
-  position: relative; page-break-after: always;
+  border: none; border-top: 2px dashed #b8c6de; margin: 18px 0;
+  height: 0; position: relative; page-break-after: always;
+}
+.pagina .salto-pagina::after {
+  content: 'Salto de página'; position: absolute; right: 0; top: -8px;
+  font-size: 8.5px; color: #9fb0cc; background: var(--pag-color, #fff); padding: 0 4px;
+  font-family: "Segoe UI", sans-serif;
 }
 .pagina ::selection { background: rgba(43,108,184,.25); }
 

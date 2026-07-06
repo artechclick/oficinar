@@ -18,7 +18,8 @@
     "hyperformula": "^3.3.0",
     "mammoth": "^1.8.0",
     "pdf-lib": "^1.17.1",
-    "pdfjs-dist": "3.11.174"
+    "pdfjs-dist": "3.11.174",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "electron": "^43.0.0",
@@ -40,7 +41,9 @@
       "!**/node_modules/.cache"
     ],
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "build/icon.png"
     },
     "nsis": {
@@ -57,16 +60,25 @@
       "displayName": "Oficinar",
       "backgroundColor": "#1a1030",
       "showNameOnTiles": true,
-      "languages": ["es-ES", "es-CO", "en-US"]
+      "languages": [
+        "es-ES",
+        "es-CO",
+        "en-US"
+      ]
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "icon": "build/icon.png",
       "category": "Office",
       "maintainer": "ARTECH CLICK <artech.click@gmail.com>"
     },
     "mac": {
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "icon": "build/icon.png",
       "category": "public.app-category.productivity"
     }

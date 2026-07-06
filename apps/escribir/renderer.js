@@ -155,6 +155,10 @@ function repaginar() {
   clearTimeout(timerRepag);
   const caret = capturarCaret();
 
+  // Quitar encabezados/pies antes de redistribuir bloques: si se quedan, el manejo de
+  // saltos de página los arrastra a otras páginas y se duplican/desordenan.
+  marco.querySelectorAll('.pag-encabezado, .pag-pie').forEach(d => d.remove());
+
   for (let i = 0; i < 400; i++) {
     const pgs = paginasDoc();
     if (i >= pgs.length) break;
@@ -929,7 +933,30 @@ async function abrirRuta(ruta) {
       establecerHTML(j.html || '<p><br></p>');
     } else if (ext === '.docx') {
       const mammoth = require('mammoth');
-      const r = await mammoth.convertToHtml({ path: ruta });
+      const r = await mammoth.convertToHtml({ path: ruta }, {
+        includeDefaultStyleMap: true,
+        // Insertar las imágenes del documento como data URI
+        convertImage: mammoth.images.imgElement(async (image) => {
+          const b64 = await image.read('base64');
+          return { src: `data:${image.contentType};base64,${b64}` };
+        }),
+        // Adaptar estilos de párrafo de Word a los de la app
+        styleMap: [
+          "p[style-name='Title'] => h1:fresh",
+          "p[style-name='Subtitle'] => h2:fresh",
+          "p[style-name='Heading 1'] => h1:fresh",
+          "p[style-name='Heading 2'] => h2:fresh",
+          "p[style-name='Heading 3'] => h3:fresh",
+          "p[style-name='Heading 4'] => h4:fresh",
+          "p[style-name='Quote'] => blockquote:fresh",
+          "p[style-name='Intense Quote'] => blockquote:fresh",
+          "r[style-name='Strong'] => strong",
+          "r[style-name='Emphasis'] => em",
+          "b => strong",
+          "i => em",
+          "u => u"
+        ]
+      });
       establecerHTML(r.value || '<p><br></p>');
     } else if (ext === '.html' || ext === '.htm') {
       const doc = new DOMParser().parseFromString(fs.readFileSync(ruta, 'utf8'), 'text/html');
