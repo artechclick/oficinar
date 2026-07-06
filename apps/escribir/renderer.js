@@ -638,7 +638,25 @@ function insertarNotaPie() {
   contadorNotas++;
   const n = contadorNotas;
   const p = paginaActiva();
-  insertarHTML(`<sup class="nota-ref" data-nota="${n}">[${n}]</sup>`);
+  // Insertar la marca como nodo real (execCommand('insertHTML') convierte <sup class> en <span>,
+  // perdiendo la clase). Con la API de Range la marca conserva su clase.
+  const marca = document.createElement('sup');
+  marca.className = 'nota-ref';
+  marca.dataset.nota = n;
+  marca.textContent = `[${n}]`;
+  p.focus({ preventScroll: true });
+  restaurarRango();
+  const sel = window.getSelection();
+  if (sel.rangeCount && p.contains(sel.anchorNode)) {
+    const r = sel.getRangeAt(0);
+    r.deleteContents();
+    r.insertNode(marca);
+    r.setStartAfter(marca); r.collapse(true);
+    sel.removeAllRanges(); sel.addRange(r);
+    guardarRango();
+  } else {
+    p.appendChild(marca);
+  }
   // Añadir el cuerpo de la nota al final de la página actual
   let cont = p.querySelector(':scope > .notas-pie-cont');
   if (!cont) { cont = document.createElement('div'); cont.className = 'notas-pie-cont'; p.appendChild(cont); }
