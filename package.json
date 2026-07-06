@@ -6,7 +6,8 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist:win": "electron-builder --win",
+    "dist:win": "electron-builder --win nsis",
+    "dist:store": "electron-builder --win appx",
     "dist:linux": "electron-builder --linux",
     "dist:mac": "electron-builder --mac"
   },
@@ -47,6 +48,16 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "shortcutName": "Oficinar"
+    },
+    "appx": {
+      "applicationId": "Oficinar",
+      "identityName": "ARTECHCLICK.Oficinar",
+      "publisher": "CN=ARTECH CLICK",
+      "publisherDisplayName": "ARTECH CLICK",
+      "displayName": "Oficinar",
+      "backgroundColor": "#1a1030",
+      "showNameOnTiles": true,
+      "languages": ["es-ES", "es-CO", "en-US"]
     },
     "linux": {
       "target": ["AppImage", "deb"],
