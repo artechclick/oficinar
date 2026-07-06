@@ -2,10 +2,11 @@
 const { ipcRenderer, clipboard } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { HyperFormula } = require('hyperformula');
+const { HyperFormula, DetailedCellError } = require('hyperformula');
 const esES = require('hyperformula/commonjs/i18n/languages/esES.js').default;
 
-HyperFormula.registerLanguage('esES', esES);
+// formulas-extra.js (cargado antes) ya registra el idioma y las funciones adicionales
+try { HyperFormula.registerLanguage('esES', esES); } catch (e) { /* ya registrado */ }
 
 // ---------- Configuración ----------
 const FILAS = 5000;
@@ -596,11 +597,29 @@ function cerrarEditor() {
 function aplicarValor(r, c, texto) {
   try {
     const v = (texto === '') ? null : texto;
-    hf.setCellContents({ sheet: hojaActual, row: r, col: c }, [[v]]);
+    const ad = { sheet: hojaActual, row: r, col: c };
+    hf.setCellContents(ad, [[v]]);
+    if (typeof v === 'string' && v.trim().startsWith('=')) autocorregirFormula(ad, v);
     marcarModificado();
   } catch (e) {
     alert('No se pudo introducir el valor:\n' + e.message);
   }
+}
+
+// Si la fórmula da error de nombre (#¿NOMBRE?) o de sintaxis (#ERROR!), prueba
+// variantes corregidas (nombres en inglés -> español, comas -> punto y coma)
+// y se queda con la primera que funcione; si ninguna, restaura la original.
+function esErrorDeEscritura(ad) {
+  let v; try { v = hf.getCellValue(ad); } catch (e) { return false; }
+  return v instanceof DetailedCellError && (v.type === 'NAME' || v.type === 'ERROR');
+}
+function autocorregirFormula(ad, original) {
+  if (!window.FORMULAS_EXTRA || !esErrorDeEscritura(ad)) return;
+  for (const variante of FORMULAS_EXTRA.corregirFormula(original)) {
+    try { hf.setCellContents(ad, [[variante]]); } catch (e) { continue; }
+    if (!esErrorDeEscritura(ad)) return;
+  }
+  try { hf.setCellContents(ad, [[original]]); } catch (e) { }
 }
 
 // Insertar referencia al hacer clic mientras se edita una fórmula
@@ -658,10 +677,14 @@ window.addEventListener('mousemove', (e) => {
   } else if (arrastrandoRelleno) {
     const { r, c } = celdaEnEvento(e);
     const n = selNorm();
-    // Solo hacia abajo o hacia la derecha (lo más habitual)
-    if (r > n.r2) rellenoDestino = { tipo: 'abajo', hasta: r };
-    else if (c > n.c2) rellenoDestino = { tipo: 'derecha', hasta: c };
-    else rellenoDestino = null;
+    // Dirección dominante: hacia donde más se aleje el puntero de la selección
+    const dAbajo = r - n.r2, dArriba = n.r1 - r, dDer = c - n.c2, dIzq = n.c1 - c;
+    const max = Math.max(dAbajo, dArriba, dDer, dIzq);
+    if (max <= 0) rellenoDestino = null;
+    else if (max === dAbajo) rellenoDestino = { tipo: 'abajo', hasta: r };
+    else if (max === dDer) rellenoDestino = { tipo: 'derecha', hasta: c };
+    else if (max === dArriba) rellenoDestino = { tipo: 'arriba', hasta: r };
+    else rellenoDestino = { tipo: 'izquierda', hasta: c };
     dibujarPrevisualizacionRelleno();
   }
 });
@@ -678,61 +701,131 @@ window.addEventListener('mouseup', () => {
 
 function dibujarPrevisualizacionRelleno() {
   const n = selNorm();
-  let r2 = n.r2, c2 = n.c2;
+  let r1 = n.r1, r2 = n.r2, c1 = n.c1, c2 = n.c2;
   if (rellenoDestino) {
     if (rellenoDestino.tipo === 'abajo') r2 = rellenoDestino.hasta;
-    else c2 = rellenoDestino.hasta;
+    else if (rellenoDestino.tipo === 'derecha') c2 = rellenoDestino.hasta;
+    else if (rellenoDestino.tipo === 'arriba') r1 = rellenoDestino.hasta;
+    else c1 = rellenoDestino.hasta;
   }
-  const x = offsetsCol[n.c1], y = offY(n.r1);
+  const x = offsetsCol[c1], y = offY(r1);
   selEl.style.left = x + 'px'; selEl.style.top = y + 'px';
   selEl.style.width = (offsetsCol[c2 + 1] - x - 1) + 'px';
   selEl.style.height = (offY(r2 + 1) - y - 1) + 'px';
 }
 
+// Lee una celda de origen para la predicción de patrones
+function celdaParaPatron(r, c) {
+  const ad = { sheet: hojaActual, row: r, col: c };
+  let ser = null, val = null, tipo = '';
+  try { ser = hf.getCellSerialized(ad); } catch (e) { }
+  try { val = hf.getCellValue(ad); } catch (e) { }
+  try { tipo = hf.getCellValueDetailedType(ad); } catch (e) { }
+  if (ser === undefined) ser = null;
+  if (val !== null && typeof val === 'object') val = null; // los errores no forman series
+  return { ser, val, tipo };
+}
+
+// Rellena una línea (columna o fila) prediciendo el patrón de los valores de origen
+function rellenarLinea(vertical, fija, n, pasos, inverso) {
+  const desde = vertical ? n.r1 : n.c1, hastaSel = vertical ? n.r2 : n.c2;
+  const idxs = [];
+  for (let i = desde; i <= hastaSel; i++) idxs.push(i);
+  if (inverso) idxs.reverse();
+  const items = idxs.map(i => vertical ? celdaParaPatron(i, fija) : celdaParaPatron(fija, i));
+  const patron = PATRONES.predecirPatron(items);
+
+  if (patron.tipo === 'serie') {
+    const valores = [];
+    for (let k = 1; k <= pasos; k++) valores.push(patron.valor(k));
+    if (inverso) valores.reverse();
+    if (vertical) {
+      const row0 = inverso ? n.r1 - pasos : n.r2 + 1;
+      hf.setCellContents({ sheet: hojaActual, row: row0, col: fija }, valores.map(v => [v]));
+    } else {
+      const col0 = inverso ? n.c1 - pasos : n.c2 + 1;
+      hf.setCellContents({ sheet: hojaActual, row: fija, col: col0 }, [valores]);
+    }
+    return;
+  }
+
+  // Fórmulas o sin patrón: copiar el bloque cíclicamente (referencias relativas)
+  for (let k = 1; k <= pasos; k++) {
+    const src = idxs[(k - 1) % idxs.length];
+    const base = inverso ? (vertical ? n.r1 : n.c1) - k : (vertical ? n.r2 : n.c2) + k;
+    const o = vertical ? { row: src, col: fija } : { row: fija, col: src };
+    const d = vertical ? { row: base, col: fija } : { row: fija, col: base };
+    hf.copy({ start: { sheet: hojaActual, ...o }, end: { sheet: hojaActual, ...o } });
+    hf.paste({ sheet: hojaActual, ...d });
+  }
+}
+
 function ejecutarRelleno() {
   const n = selNorm();
-  const origen = {
-    start: { sheet: hojaActual, row: n.r1, col: n.c1 },
-    end: { sheet: hojaActual, row: n.r2, col: n.c2 }
-  };
-  const altoBloque = n.r2 - n.r1 + 1, anchoBloque = n.c2 - n.c1 + 1;
+  const dir = rellenoDestino.tipo, hasta = rellenoDestino.hasta;
+  const vertical = dir === 'abajo' || dir === 'arriba';
+  const inverso = dir === 'arriba' || dir === 'izquierda';
+  const pasos = vertical
+    ? (inverso ? n.r1 - hasta : hasta - n.r2)
+    : (inverso ? n.c1 - hasta : hasta - n.c2);
+  if (pasos <= 0) return;
   try {
-    if (rellenoDestino.tipo === 'abajo') {
-      for (let r = n.r2 + 1; r <= rellenoDestino.hasta; r += altoBloque) {
-        hf.copy(origen);
-        hf.paste({ sheet: hojaActual, row: r, col: n.c1 });
-      }
-      sel.r2 = rellenoDestino.hasta;
-      copiarEstilosRelleno(n, 'abajo', rellenoDestino.hasta);
-    } else {
-      for (let c = n.c2 + 1; c <= rellenoDestino.hasta; c += anchoBloque) {
-        hf.copy(origen);
-        hf.paste({ sheet: hojaActual, row: n.r1, col: c });
-      }
-      sel.c2 = rellenoDestino.hasta;
-      copiarEstilosRelleno(n, 'derecha', rellenoDestino.hasta);
-    }
+    if (vertical) for (let c = n.c1; c <= n.c2; c++) rellenarLinea(true, c, n, pasos, inverso);
+    else for (let r = n.r1; r <= n.r2; r++) rellenarLinea(false, r, n, pasos, inverso);
+    copiarEstilosRelleno(n, dir, hasta);
+    if (dir === 'abajo') sel = { r1: n.r1, c1: n.c1, r2: hasta, c2: n.c2 };
+    else if (dir === 'derecha') sel = { r1: n.r1, c1: n.c1, r2: n.r2, c2: hasta };
+    else if (dir === 'arriba') sel = { r1: hasta, c1: n.c1, r2: n.r2, c2: n.c2 };
+    else sel = { r1: n.r1, c1: hasta, r2: n.r2, c2: n.c2 };
     marcarModificado();
   } catch (e) { alert('No se pudo rellenar: ' + e.message); }
 }
 function copiarEstilosRelleno(n, tipo, hasta) {
   const m = meta();
+  const alto = n.r2 - n.r1 + 1, ancho = n.c2 - n.c1 + 1;
+  const cp = (rD, cD, rS, cS) => {
+    const src = m.estilos.get(claveEstilo(rS, cS));
+    if (src) m.estilos.set(claveEstilo(rD, cD), Object.assign({}, src)); else m.estilos.delete(claveEstilo(rD, cD));
+  };
   if (tipo === 'abajo') {
-    const alto = n.r2 - n.r1 + 1;
-    for (let r = n.r2 + 1; r <= hasta; r++)
-      for (let c = n.c1; c <= n.c2; c++) {
-        const src = m.estilos.get(claveEstilo(n.r1 + ((r - n.r1) % alto), c));
-        if (src) m.estilos.set(claveEstilo(r, c), Object.assign({}, src)); else m.estilos.delete(claveEstilo(r, c));
-      }
+    for (let k = 1; k <= hasta - n.r2; k++)
+      for (let c = n.c1; c <= n.c2; c++) cp(n.r2 + k, c, n.r1 + ((k - 1) % alto), c);
+  } else if (tipo === 'arriba') {
+    for (let k = 1; k <= n.r1 - hasta; k++)
+      for (let c = n.c1; c <= n.c2; c++) cp(n.r1 - k, c, n.r2 - ((k - 1) % alto), c);
+  } else if (tipo === 'derecha') {
+    for (let k = 1; k <= hasta - n.c2; k++)
+      for (let r = n.r1; r <= n.r2; r++) cp(r, n.c2 + k, r, n.c1 + ((k - 1) % ancho));
   } else {
-    const ancho = n.c2 - n.c1 + 1;
-    for (let c = n.c2 + 1; c <= hasta; c++)
-      for (let r = n.r1; r <= n.r2; r++) {
-        const src = m.estilos.get(claveEstilo(r, n.c1 + ((c - n.c1) % ancho)));
-        if (src) m.estilos.set(claveEstilo(r, c), Object.assign({}, src)); else m.estilos.delete(claveEstilo(r, c));
-      }
+    for (let k = 1; k <= n.c1 - hasta; k++)
+      for (let r = n.r1; r <= n.r2; r++) cp(r, n.c1 - k, r, n.c2 - ((k - 1) % ancho));
   }
 }
+
+// Doble clic en el asa de relleno: rellenar hacia abajo hasta donde
+// lleguen los datos de las columnas vecinas (como en Excel)
+asaEl.addEventListener('dblclick', (e) => {
+  e.preventDefault(); e.stopPropagation();
+  const n = selNorm();
+  const lleno = (r, c) => {
+    if (r < 0 || c < 0 || r >= FILAS || c >= COLS) return false;
+    let v; try { v = hf.getCellValue({ sheet: hojaActual, row: r, col: c }); } catch (err) { return false; }
+    return v !== null && v !== undefined && v !== '';
+  };
+  let hasta = -1;
+  for (const c of [n.c1 - 1, n.c2 + 1]) {
+    if (c < 0 || c >= COLS || !lleno(n.r2, c)) continue;
+    let r = n.r2;
+    while (r + 1 < FILAS && lleno(r + 1, c)) r++;
+    hasta = Math.max(hasta, r);
+  }
+  if (hasta > n.r2) {
+    rellenoDestino = { tipo: 'abajo', hasta };
+    ejecutarRelleno();
+    rellenoDestino = null;
+    render();
+  }
+});
 
 viewport.addEventListener('dblclick', (e) => {
   const { r, c } = celdaEnEvento(e);

@@ -111,6 +111,29 @@
 .ia-msg.pensando::after { content: '●●●'; letter-spacing: 3px; animation: iaPuls 1.2s infinite; margin-left: 6px; font-style: normal; }
 @keyframes iaPuls { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
 
+/* Indicador de escritura: tres puntos que rebotan mientras la IA responde */
+.ia-msg.ia-escribiendo {
+  display: flex; align-items: center; gap: 5px;
+  padding: 13px 16px; width: fit-content; min-height: 0;
+}
+.ia-escribiendo .ia-punto {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: linear-gradient(135deg, #6b8cff, #7a6cff);
+  animation: iaRebote 1.2s ease-in-out infinite;
+}
+.ia-escribiendo .ia-punto:nth-child(2) { animation-delay: .15s; }
+.ia-escribiendo .ia-punto:nth-child(3) { animation-delay: .3s; }
+@keyframes iaRebote {
+  0%, 60%, 100% { transform: translateY(0); opacity: .4; }
+  30% { transform: translateY(-5px); opacity: 1; }
+}
+
+/* Cursor parpadeante mientras la respuesta se escribe progresivamente */
+.ia-md.escribiendo > *:last-child::after,
+.ia-md.escribiendo:empty::after {
+  content: '▍'; color: #7a6cff; animation: iaPuls .8s infinite; margin-left: 1px;
+}
+
 .ia-acciones { display: flex; gap: 6px; margin-top: 7px; }
 .ia-accion {
   border: 1px solid rgba(110, 120, 200, .35); background: rgba(255,255,255,.6);

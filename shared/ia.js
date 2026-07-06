@@ -264,31 +264,47 @@
   }
 
   // ---------- Chat ----------
+  // Indicador de escritura: burbuja con tres puntos animados mientras la IA responde
+  function crearIndicadorEscribiendo() {
+    $('iaVacio').style.display = 'none';
+    const div = document.createElement('div');
+    div.className = 'ia-msg ia ia-escribiendo';
+    div.title = 'La IA está escribiendo...';
+    div.innerHTML = '<span class="ia-punto"></span><span class="ia-punto"></span><span class="ia-punto"></span>';
+    mensajesEl.appendChild(div);
+    mensajesEl.scrollTop = mensajesEl.scrollHeight;
+    return div;
+  }
+
+  // Efecto de escritura: revela el texto progresivamente con cursor parpadeante
+  function escribirProgresivo(el, texto, alTerminar) {
+    el.classList.add('escribiendo');
+    const total = texto.length;
+    const paso = Math.max(2, Math.ceil(total / 220)); // termina en ~3,5 s como máximo
+    let i = 0;
+    const timer = setInterval(() => {
+      i = Math.min(total, i + paso);
+      el.innerHTML = mdAHTML(texto.slice(0, i));
+      // Mantener la vista abajo solo si el usuario no subió a leer
+      if (mensajesEl.scrollHeight - mensajesEl.scrollTop - mensajesEl.clientHeight < 90) {
+        mensajesEl.scrollTop = mensajesEl.scrollHeight;
+      }
+      if (i >= total) {
+        clearInterval(timer);
+        el.classList.remove('escribiendo');
+        el.innerHTML = mdAHTML(texto);
+        if (alTerminar) alTerminar();
+      }
+    }, 16);
+  }
+
   function agregarMensaje(rol, texto, opciones) {
     $('iaVacio').style.display = 'none';
     const div = document.createElement('div');
     div.className = 'ia-msg ' + rol + (opciones && opciones.clase ? ' ' + opciones.clase : '');
-    if (rol === 'ia' && !(opciones && opciones.clase)) {
-      // Respuesta normal de la IA: razonamiento plegable + cuerpo con formato
-      if (opciones && opciones.razonamiento) {
-        const det = document.createElement('details');
-        det.className = 'ia-think';
-        const sum = document.createElement('summary');
-        sum.textContent = '💭 Razonamiento del modelo';
-        const cuerpo = document.createElement('div');
-        cuerpo.className = 'ia-think-cuerpo';
-        cuerpo.textContent = opciones.razonamiento;
-        det.appendChild(sum); det.appendChild(cuerpo);
-        div.appendChild(det);
-      }
-      const md = document.createElement('div');
-      md.className = 'ia-md';
-      md.innerHTML = mdAHTML(texto || '');
-      div.appendChild(md);
-    } else {
-      div.textContent = texto;
-    }
-    if (rol === 'ia' && !(opciones && opciones.sinAcciones)) {
+
+    const agregarAcciones = () => {
+      if (rol !== 'ia' || (opciones && opciones.sinAcciones)) return;
       const acciones = document.createElement('div');
       acciones.className = 'ia-acciones';
       if (app().insertar) {
@@ -304,6 +320,33 @@
       c.addEventListener('click', () => { clipboard.writeText(texto); c.textContent = '✓ Copiado'; setTimeout(() => c.textContent = 'Copiar', 1200); });
       acciones.appendChild(c);
       div.appendChild(acciones);
+    };
+
+    if (rol === 'ia' && !(opciones && opciones.clase)) {
+      // Respuesta normal de la IA: razonamiento plegable + cuerpo con formato
+      if (opciones && opciones.razonamiento) {
+        const det = document.createElement('details');
+        det.className = 'ia-think';
+        const sum = document.createElement('summary');
+        sum.textContent = '💭 Razonamiento del modelo';
+        const cuerpo = document.createElement('div');
+        cuerpo.className = 'ia-think-cuerpo';
+        cuerpo.textContent = opciones.razonamiento;
+        det.appendChild(sum); det.appendChild(cuerpo);
+        div.appendChild(det);
+      }
+      const md = document.createElement('div');
+      md.className = 'ia-md';
+      div.appendChild(md);
+      if (opciones && opciones.maquina && texto) {
+        escribirProgresivo(md, texto, agregarAcciones);
+      } else {
+        md.innerHTML = mdAHTML(texto || '');
+        agregarAcciones();
+      }
+    } else {
+      div.textContent = texto;
+      agregarAcciones();
     }
     mensajesEl.appendChild(div);
     mensajesEl.scrollTop = mensajesEl.scrollHeight;
@@ -411,7 +454,7 @@
 
     ocupado = true;
     $('iaEnviar').disabled = true;
-    const espera = agregarMensaje('ia', 'Pensando', { clase: 'pensando', sinAcciones: true });
+    const espera = crearIndicadorEscribiendo();
 
     const r = await ipcRenderer.invoke('ia-chat', {
       proveedor: ia.proveedor,
@@ -430,7 +473,8 @@
       const { limpio, razonamiento } = extraerRazonamiento(r.texto);
       historial.push({ rol: 'ia', texto: limpio || r.texto });
       const { texto: visible, acciones } = separarAcciones(limpio);
-      if (visible || razonamiento) agregarMensaje('ia', visible, { razonamiento });
+      // Efecto de escritura solo cuando no hay acciones pendientes de ejecutar
+      if (visible || razonamiento) agregarMensaje('ia', visible, { razonamiento, maquina: !acciones });
       if (acciones) {
         const resultados = await ejecutarAcciones(acciones);
         for (const res of resultados) {
