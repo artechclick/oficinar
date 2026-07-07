@@ -88,7 +88,25 @@ function paginaActiva() {
   if (ultimoRango) { const p = paginaDe(ultimoRango.startContainer); if (p) return p; }
   return paginasDoc()[0];
 }
-function contenidoHTML() { return paginasDoc().map(p => p.innerHTML).join(''); }
+// Serializa el documento reunificando los bloques divididos entre páginas,
+// para que los archivos guardados contengan párrafos completos.
+function contenidoHTML() {
+  const t = document.createElement('template');
+  t.innerHTML = paginasDoc().map(p => p.innerHTML).join('');
+  t.content.querySelectorAll('[data-continuacion]').forEach(cont => {
+    let previo = cont.previousElementSibling;
+    while (previo && esDecoracion(previo)) previo = previo.previousElementSibling;
+    if (previo && previo.tagName === cont.tagName) {
+      while (cont.firstChild) previo.appendChild(cont.firstChild);
+      cont.remove();
+    } else {
+      cont.removeAttribute('data-continuacion');
+    }
+  });
+  const div = document.createElement('div');
+  div.appendChild(t.content);
+  return div.innerHTML;
+}
 function textoDocumento() { return paginasDoc().map(p => p.innerText || '').join('\n'); }
 
 function establecerHTML(html) {
@@ -181,15 +199,137 @@ function envolverInline(p, n) {
   return env.nextSibling;
 }
 
-// ¿El contenido de la página supera el área útil (altura menos márgenes vertical)?
-// Se mide con offset (fiable con zoom) en vez de scrollHeight (que ignora el padding inferior).
-function desborda(p) {
-  const bloques = bloquesEn(p);
-  if (bloques.length <= 1) return false;
-  const ratioMargen = formatoPagina.margen / dimensionesPagina().h;
-  const fondoUtil = p.clientHeight * (1 - ratioMargen);
-  const ultimo = bloques[bloques.length - 1];
-  return (ultimo.offsetTop + ultimo.offsetHeight) > fondoUtil + 0.5;
+// Límite inferior del área útil (alto menos margen inferior) en coordenadas de cliente.
+// Se mide con rects de cliente: son fiables con zoom porque página y bloque se escalan juntos.
+function limiteInferiorPagina(p) {
+  const r = p.getBoundingClientRect();
+  return r.top + r.height * (1 - formatoPagina.margen / dimensionesPagina().h);
+}
+// ¿El último bloque de la página sobrepasa el área útil?
+function rebasaPagina(p) {
+  const ult = ultimoBloque(p);
+  if (!ult) return false;
+  return ult.getBoundingClientRect().bottom > limiteInferiorPagina(p) + 0.5;
+}
+
+// ---------- División de bloques entre páginas (flujo natural tipo Word) ----------
+// Un bloque que cruza el límite inferior se corta al inicio de la primera línea que
+// sobresale; el resto pasa a la página siguiente marcado con data-continuacion.
+// Al comienzo de cada repaginación las continuaciones se reunifican con su origen,
+// así el texto también fluye de vuelta hacia arriba cuando se borra contenido.
+const RE_BLOQUE_DIVISIBLE = /^(P|DIV|BLOCKQUOTE|PRE|H1|H2|H3|H4|H5|H6)$/;
+
+// Divide el bloque en el límite dado; devuelve el elemento continuación o null si no se puede
+function dividirBloque(bloque, limite) {
+  if (esSaltoPagina(bloque) || esBloqueProtegido(bloque)) return null;
+  if (bloque.tagName === 'UL' || bloque.tagName === 'OL') return dividirLista(bloque, limite);
+  if (!RE_BLOQUE_DIVISIBLE.test(bloque.tagName) || bloque.querySelector('table')) return null;
+  // Descontar el relleno/borde inferior del propio bloque (p.ej. <pre>) del límite
+  const est = getComputedStyle(bloque);
+  const limiteInterno = limite - (parseFloat(est.paddingBottom) || 0) - (parseFloat(est.borderBottomWidth) || 0);
+  const punto = puntoDivisionLinea(bloque, limiteInterno);
+  if (!punto) return null;
+  const r = document.createRange();
+  r.selectNodeContents(bloque);
+  try { r.setStart(punto.nodo, punto.offset); } catch (e) { return null; }
+  if (r.collapsed) return null;
+  const frag = r.extractContents();
+  const cont = bloque.cloneNode(false);
+  cont.removeAttribute('id');
+  cont.setAttribute('data-continuacion', '1');
+  cont.appendChild(frag);
+  // Si alguna mitad quedó sin contenido visible, deshacer la división
+  const vacio = (el) => !el.textContent.trim() && !el.querySelector('img, br');
+  if (vacio(cont) || vacio(bloque)) {
+    while (cont.firstChild) bloque.appendChild(cont.firstChild);
+    return null;
+  }
+  return cont;
+}
+
+// Lista (ul/ol): se divide por ítems; la continuación de un ol conserva la numeración
+function dividirLista(lista, limite) {
+  const items = [...lista.children].filter(el => el.tagName === 'LI');
+  if (items.length < 2) return null;
+  let corte = -1;
+  for (let k = 0; k < items.length; k++) {
+    if (items[k].getBoundingClientRect().bottom > limite + 0.5) { corte = k; break; }
+  }
+  if (corte <= 0) return null;
+  const cont = lista.cloneNode(false);
+  cont.setAttribute('data-continuacion', '1');
+  if (lista.tagName === 'OL') {
+    const inicio = parseInt(lista.getAttribute('start'), 10) || 1;
+    cont.setAttribute('start', String(inicio + corte));
+  }
+  for (let k = corte; k < items.length; k++) cont.appendChild(items[k]);
+  return cont;
+}
+
+// Punto (nodo de texto, offset) donde empieza la primera línea que sobresale del límite.
+// null = todo cabe, o ni siquiera cabe la primera línea (el bloque se mueve entero).
+function puntoDivisionLinea(bloque, limite) {
+  const nodos = [];
+  let total = 0;
+  const walker = document.createTreeWalker(bloque, NodeFilter.SHOW_TEXT);
+  let n;
+  while ((n = walker.nextNode())) {
+    if (n.nodeValue.length) { nodos.push({ nodo: n, ini: total }); total += n.nodeValue.length; }
+  }
+  if (total < 2) return null;
+  const rango = document.createRange();
+  const rectDe = (i) => {
+    let k = nodos.length - 1;
+    while (k > 0 && nodos[k].ini > i) k--;
+    const off = Math.min(i - nodos[k].ini, nodos[k].nodo.nodeValue.length - 1);
+    rango.setStart(nodos[k].nodo, off);
+    rango.setEnd(nodos[k].nodo, off + 1);
+    const rects = rango.getClientRects();
+    let rc = rects.length ? rects[0] : rango.getBoundingClientRect();
+    // Carácter colapsado (espacio al final de renglón): usar el rect del cursor
+    if (!rc.height && !rc.width) { rango.collapse(true); rc = rango.getBoundingClientRect(); }
+    return rc;
+  };
+  // Búsqueda binaria del primer carácter que sobresale (la Y crece con el índice)
+  let lo = 0, hi = total - 1, primero = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (rectDe(mid).bottom > limite + 0.5) { primero = mid; hi = mid - 1; } else lo = mid + 1;
+  }
+  if (primero <= 0) return null;
+  // Retroceder al inicio de esa línea para no cortar a mitad de renglón
+  const topLinea = rectDe(primero).top;
+  let corte = primero;
+  lo = 0; hi = primero;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (rectDe(mid).top >= topLinea - 0.5) { corte = mid; hi = mid - 1; } else lo = mid + 1;
+  }
+  if (corte <= 0) return null;
+  let k = nodos.length - 1;
+  while (k > 0 && nodos[k].ini > corte) k--;
+  return { nodo: nodos[k].nodo, offset: corte - nodos[k].ini };
+}
+
+// Reunifica cada continuación (primer bloque de una página) con el último bloque
+// de las páginas anteriores; las continuaciones sueltas pierden la marca.
+function fusionarContinuaciones() {
+  const pgs = paginasDoc();
+  for (let k = 0; k < pgs.length; k++) {
+    for (const b of bloquesEn(pgs[k])) {
+      if (!b.hasAttribute('data-continuacion')) continue;
+      let origen = null;
+      if (k > 0 && b === primerBloque(pgs[k])) {
+        for (let j = k - 1; j >= 0 && !origen; j--) origen = ultimoBloque(pgs[j]);
+      }
+      if (origen && origen.tagName === b.tagName && !esSaltoPagina(origen) && !esBloqueProtegido(origen)) {
+        while (b.firstChild) origen.appendChild(b.firstChild);
+        b.remove();
+      } else {
+        b.removeAttribute('data-continuacion');
+      }
+    }
+  }
 }
 
 function capturarCaret() {
@@ -210,6 +350,27 @@ function restaurarCaret(r) {
 
 function forzarReflow(el) {
   if (el) void el.offsetHeight;
+}
+
+// Si la repaginación movió el cursor a otra hoja, desplazar la vista para mantenerlo visible
+function asegurarCaretVisible() {
+  const activo = document.activeElement;
+  if (!activo || !activo.classList || !activo.classList.contains('pagina')) return;
+  const s = window.getSelection();
+  if (!s.rangeCount) return;
+  const r = s.getRangeAt(0);
+  let rect = r.getBoundingClientRect();
+  if (!rect || (!rect.top && !rect.bottom && !rect.height)) {
+    // Rango sin rect (p.ej. párrafo vacío): usar el rect del nodo donde está el cursor
+    const cont = r.startContainer;
+    if (cont.nodeType !== 1) return;
+    const el = cont.childNodes[Math.min(r.startOffset, cont.childNodes.length - 1)];
+    rect = (el && el.getBoundingClientRect) ? el.getBoundingClientRect() : cont.getBoundingClientRect();
+  }
+  const area = $('areaDoc');
+  const ra = area.getBoundingClientRect();
+  if (rect.bottom > ra.bottom - 30) area.scrollTop += rect.bottom - (ra.bottom - 30);
+  else if (rect.top < ra.top + 10) area.scrollTop -= (ra.top + 10) - rect.top;
 }
 
 let rafRepag = null;
@@ -300,19 +461,25 @@ function recolectarBloques() {
   return grupos;
 }
 
-// Paginación INCREMENTAL: solo mueve los bloques del borde entre páginas adyacentes.
-// Ventajas: no reconstruye el documento (el cursor se conserva porque los nodos no se
-// destruyen, solo se mueven) y es rápido en vivo (normalmente 0-1 movimientos por tecla).
+// Paginación INCREMENTAL: mueve los bloques del borde entre páginas adyacentes y
+// divide por línea el bloque que cruza el límite (flujo natural tipo Word).
+// El cursor se captura como offsets de texto y se restaura al final, porque los
+// rangos del DOM no siguen a los nodos cuando se mueven de página.
 function repaginar() {
   repagPendiente = false;
   if (paginasDoc().length === 0) marco.appendChild(crearPagina());
 
   const caret = capturarCaret();
+  const marcaCaret = capturarSeleccion(caret);
 
   // Quitar decoraciones (encabezado/pie) para que no cuenten como bloques al balancear.
   // El número de página se muestra con el pseudo-elemento .pagina::after (data-numero),
   // así NO hay un nodo no editable que estorbe al escribir al final de la hoja.
   marco.querySelectorAll('.pag-encabezado, .pag-pie, .pag-num').forEach(d => d.remove());
+
+  // Reunificar los párrafos divididos entre páginas: la división se recalcula
+  // desde el párrafo completo y el texto puede fluir de vuelta al borrar
+  fusionarContinuaciones();
 
   // Aplanar/normalizar cada página en bloques distribuibles
   paginasDoc().forEach(normalizarPagina);
@@ -332,14 +499,33 @@ function repaginar() {
       for (let k = resto.length - 1; k >= 0; k--) sig.insertBefore(resto[k], sig.firstChild);
     }
 
-    // Empujar bloques que desbordan hacia la página siguiente
+    // Empujar lo que sobresale: el bloque que cruza el límite se divide por línea
+    // (como Word); los que quedan del todo por debajo pasan enteros
     let g = 0;
-    while (desborda(p) && bloquesEn(p).length > 1 && g++ < 5000) {
-      const sig = obtenerPagina(i + 1);
-      sig.insertBefore(ultimoBloque(p), sig.firstChild);
+    while (rebasaPagina(p) && g++ < 5000) {
+      const limite = limiteInferiorPagina(p);
+      const ult = ultimoBloque(p);
+      if (bloquesEn(p).length > 1 && ult.getBoundingClientRect().top >= limite - 1) {
+        const sig = obtenerPagina(i + 1);
+        sig.insertBefore(ult, sig.firstChild);
+        continue;
+      }
+      const resto = dividirBloque(ult, limite);
+      if (resto) {
+        const sig = obtenerPagina(i + 1);
+        sig.insertBefore(resto, sig.firstChild);
+        continue;
+      }
+      if (bloquesEn(p).length > 1) {
+        const sig = obtenerPagina(i + 1);
+        sig.insertBefore(ult, sig.firstChild);
+        continue;
+      }
+      break; // único bloque indivisible más alto que la hoja: se recorta como antes
     }
 
-    // Subir bloques de la página siguiente mientras quepan (y no haya salto forzado)
+    // Subir bloques de la página siguiente mientras quepan (y no haya salto forzado);
+    // si el siguiente no cabe entero, se sube solo la parte que llene la página
     g = 0;
     while (g++ < 5000) {
       const sig = paginasDoc()[i + 1];
@@ -350,7 +536,12 @@ function repaginar() {
       if (!primero) { if (bloquesEn(sig).length === 0) sig.remove(); break; }
       if (esSaltoPagina(primero)) break;            // el siguiente bloque es un salto: arranca su página
       p.appendChild(primero);
-      if (desborda(p)) { sig.insertBefore(primero, sig.firstChild); break; }
+      if (rebasaPagina(p)) {
+        const resto = dividirBloque(primero, limiteInferiorPagina(p));
+        if (resto) sig.insertBefore(resto, sig.firstChild);
+        else sig.insertBefore(primero, sig.firstChild);
+        break;
+      }
     }
 
     i++;
@@ -378,53 +569,113 @@ function repaginar() {
   actualizarEncabezadosPies();
   if (formatoPagina.columnas > 1) aplicarColumnas();
 
-  // Restaurar el cursor: el rango sigue siendo válido porque solo movimos nodos
-  restaurarCaret(caret);
+  // Restaurar el cursor donde estaba (por offsets; el rango original es el respaldo)
+  if (!marcaCaret || !restaurarSeleccion(marcaCaret)) restaurarCaret(caret);
+  asegurarCaretVisible();
   actualizarEstadoPaginas();
 }
 
-// Calcula el offset en texto plano del cursor dentro del documento
-function textoOffsetDeRango(rango) {
-  if (!rango || !marco.contains(rango.startContainer)) return -1;
-  let offset = 0;
-  const walker = document.createTreeWalker(marco, NodeFilter.SHOW_TEXT);
-  let nodo;
-  while ((nodo = walker.nextNode())) {
-    if (rango.startContainer === nodo) {
-      offset += rango.startOffset;
-      return offset;
+// ---------- Seguimiento del cursor a través de la repaginación ----------
+// Mover un nodo con insertBefore/appendChild primero lo saca del DOM, y eso colapsa
+// cualquier Range que apunte a su interior: el rango NO sigue al nodo movido. Por eso
+// el cursor se captura como offsets de texto (dentro de su bloque y global al
+// documento) antes de reorganizar las páginas, y se restaura después.
+
+// Recorredor de los nodos de texto bajo una raíz, omitiendo decoraciones
+// (encabezados, pies, números): sus textos no forman parte del flujo editable.
+function crearWalkerTexto(raiz) {
+  return document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT, {
+    acceptNode(n) {
+      for (let e = n.parentNode; e && e !== raiz; e = e.parentNode) {
+        if (esDecoracion(e)) return NodeFilter.FILTER_REJECT;
+      }
+      return NodeFilter.FILTER_ACCEPT;
     }
-    offset += nodo.nodeValue.length;
-  }
-  return -1;
+  });
 }
 
-// Encuentra el rango correspondiente a un offset de texto plano
-function rangoDesdeTextoOffset(targetOffset) {
-  if (targetOffset < 0) return null;
-  let offset = 0;
-  const walker = document.createTreeWalker(marco, NodeFilter.SHOW_TEXT);
-  let nodo;
-  let lastNode = null;
-  while ((nodo = walker.nextNode())) {
-    const len = nodo.nodeValue.length;
-    if (offset + len >= targetOffset) {
-      const r = document.createRange();
-      r.setStart(nodo, targetOffset - offset);
-      r.setEnd(nodo, targetOffset - offset);
-      return r;
-    }
-    offset += len;
-    lastNode = nodo;
-  }
-  // Si el offset está al final, posicionar al final del último nodo
-  if (lastNode) {
-    const r = document.createRange();
-    r.setStart(lastNode, lastNode.nodeValue.length);
-    r.setEnd(lastNode, lastNode.nodeValue.length);
-    return r;
+// Bloque (hijo directo de una página) que contiene al nodo
+function bloqueDeNodo(n) {
+  while (n && n !== marco) {
+    const padre = n.parentNode;
+    if (n.nodeType === 1 && padre && padre.classList && padre.classList.contains('pagina')) return n;
+    n = padre;
   }
   return null;
+}
+
+// Offset en texto plano del punto (cont, off) dentro de la raíz dada; -1 si no aplica
+function offsetTextoDePunto(raiz, cont, off) {
+  if (!raiz || !raiz.contains(cont)) return -1;
+  const ref = document.createRange();
+  try { ref.setStart(cont, off); } catch (e) { return -1; }
+  ref.collapse(true);
+  let acum = 0;
+  const walker = crearWalkerTexto(raiz);
+  let t;
+  while ((t = walker.nextNode())) {
+    if (ref.comparePoint(t, t.nodeValue.length) <= 0) { acum += t.nodeValue.length; continue; }
+    if (ref.comparePoint(t, 0) >= 0) break;   // el nodo entero está después del punto
+    acum += (t === cont ? off : 0);           // el punto cae dentro de este nodo
+    break;
+  }
+  return acum;
+}
+
+// Punto (nodo, offset) correspondiente a un offset de texto dentro de la raíz.
+// Con ajustarFinal, un offset más allá del texto se lleva al final; si no, null.
+function puntoDesdeOffsetTexto(raiz, objetivo, ajustarFinal) {
+  if (objetivo < 0) return null;
+  let acum = 0, ultimo = null;
+  const walker = crearWalkerTexto(raiz);
+  let t;
+  while ((t = walker.nextNode())) {
+    const len = t.nodeValue.length;
+    if (acum + len >= objetivo) return { nodo: t, offset: objetivo - acum };
+    acum += len;
+    ultimo = t;
+  }
+  if (ajustarFinal && ultimo) return { nodo: ultimo, offset: ultimo.nodeValue.length };
+  return null;
+}
+
+function capturarSeleccion(rango) {
+  if (!rango) return null;
+  const bIni = bloqueDeNodo(rango.startContainer);
+  const bFin = bloqueDeNodo(rango.endContainer);
+  return {
+    bloqueIni: bIni, offIni: bIni ? offsetTextoDePunto(bIni, rango.startContainer, rango.startOffset) : -1,
+    bloqueFin: bFin, offFin: bFin ? offsetTextoDePunto(bFin, rango.endContainer, rango.endOffset) : -1,
+    globalIni: offsetTextoDePunto(marco, rango.startContainer, rango.startOffset),
+    globalFin: offsetTextoDePunto(marco, rango.endContainer, rango.endOffset)
+  };
+}
+
+function restaurarSeleccion(sel) {
+  // El offset dentro del bloque es exacto mientras el bloque siga vivo (se movió
+  // entero); si el bloque se dividió o fusionó, vale el offset global de texto.
+  const resolver = (bloque, offBloque, offGlobal) => {
+    if (bloque && bloque.isConnected && paginaDe(bloque) && offBloque >= 0) {
+      const p = puntoDesdeOffsetTexto(bloque, offBloque, false);
+      if (p) return p;
+      if (offBloque === 0) return { nodo: bloque, offset: 0 }; // bloque sin texto (<p><br></p>)
+    }
+    return puntoDesdeOffsetTexto(marco, offGlobal, true);
+  };
+  const ini = resolver(sel.bloqueIni, sel.offIni, sel.globalIni);
+  if (!ini) return false;
+  const r = document.createRange();
+  try {
+    r.setStart(ini.nodo, ini.offset);
+    r.collapse(true);
+    if (sel.bloqueFin !== sel.bloqueIni || sel.offFin !== sel.offIni) {
+      const fin = resolver(sel.bloqueFin, sel.offFin, sel.globalFin);
+      if (fin) r.setEnd(fin.nodo, fin.offset);
+    }
+  } catch (e) { /* punto inválido: el rango queda colapsado en el inicio */ }
+  restaurarCaret(r);
+  guardarRango();
+  return true;
 }
 
 // Bloques de flujo de una página (excluye encabezado/pie)
@@ -467,37 +718,14 @@ marco.addEventListener('keydown', (e) => {
     fin.collapse(false);
     s.removeAllRanges(); s.addRange(fin);
     guardarRango();
+    // Si la página empezaba con la continuación de un párrafo dividido, el cursor
+    // quedó en el mismo punto lógico: borrar el carácter anterior como haría Word
+    const primero = primerBloque(p);
+    if (primero && primero.hasAttribute('data-continuacion')) document.execCommand('delete');
     repaginarPronto();
     return;
   }
-  // Enter: ejecutar paginación inmediata y scroll al cursor
-  if (e.key === 'Enter' && !e.shiftKey) {
-    const s = window.getSelection();
-    if (!s.rangeCount) return;
-    const r = s.getRangeAt(0);
-    const p = paginaDe(r.startContainer);
-    if (!p) return;
-    const pgs = paginasDoc();
-    const idx = pgs.indexOf(p);
-    // Si no es la última página, deja que el navegador cree el bloque
-    // y despues la paginación reorganizará
-    setTimeout(() => {
-      repaginar();
-      // Scroll al cursor para mantenerlo visible
-      const sel = window.getSelection();
-      if (sel.rangeCount) {
-        const rr = sel.getRangeAt(0);
-        const cont = rr.startContainer;
-        if (cont.nodeType === 1) {
-          const r2 = cont.getBoundingClientRect();
-          if (r2.top > window.innerHeight - 100) {
-            const nuevaPag = paginaDe(cont);
-            if (nuevaPag) nuevaPag.scrollIntoView({ block: 'start', behavior: 'smooth' });
-          }
-        }
-      }
-    }, 0);
-  }
+  // Enter: el evento input repagina y repaginar() mantiene el cursor a la vista
 });
 
 // ---------- Utilidades ----------

@@ -1,13 +1,13 @@
 {
   "name": "oficinar",
   "productName": "Oficinar",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Oficinar - Suite de oficina: Calcular, Escribir, Presentar y Editar PDF, con asistente de IA integrado",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dist:win": "electron-builder --win nsis",
-    "dist:store": "electron-builder --win appx",
+    "dist:store": "electron-builder --win appx --x64",
     "dist:linux": "electron-builder --linux",
     "dist:mac": "electron-builder --mac"
   },

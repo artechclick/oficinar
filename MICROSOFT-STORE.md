@@ -1,12 +1,17 @@
 # Publicar Oficinar en la Microsoft Store
 
-El paquete para la Store se genera con:
+El paquete para la Store se genera **en un PC con Windows** con:
 
 ```bash
+npm ci
 npm run dist:store
 ```
 
-Esto produce **`dist/Oficinar 1.0.0.appx`** (paquete APPX sin firmar: la Store lo firma al publicarlo).
+Esto produce **`dist/Oficinar <versión>.appx`** (paquete APPX x64 sin firmar: la Store lo firma al publicarlo).
+
+> ⚠️ El destino `appx` no se puede compilar en macOS (electron-builder exige Parallels
+> Desktop con una VM de Windows). Si al compilar en Windows aparece `makeappx.exe not found`,
+> instala el **Windows 10/11 SDK** (`winget install Microsoft.WindowsSDK.10.0.22621`).
 
 ## Paso 1 — Cuenta de desarrollador
 
