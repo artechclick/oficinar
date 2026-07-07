@@ -68,6 +68,10 @@ select { height: 24px; border: 1px solid var(--gris-borde); background: rgba(255
   flex: 1 1 auto; overflow: auto; padding: 0 0 60px 0;
   display: flex; flex-direction: column; align-items: center;
 }
+#areaDocInter {
+  display: flex; flex-direction: row; justify-content: center;
+  width: 100%;
+}
 #regla {
   position: sticky; top: 0; z-index: 20;
   width: 816px; height: 24px; margin-bottom: 14px; flex: 0 0 auto;
@@ -101,10 +105,22 @@ select { height: 24px; border: 1px solid var(--gris-borde); background: rgba(255
   line-height: 1.15; color: #111;
   position: relative;
 }
-.pagina::after {
+.pagina::before {
+  content: ''; position: absolute; top: var(--pag-margen); bottom: var(--pag-margen);
+  left: var(--pag-margen); width: 1px;
+  background: rgba(43,108,184,.12); pointer-events: none;
+  z-index: 1;
+}
+.pagina::before {  /* guía del margen derecho */
+  content: ''; position: absolute; top: var(--pag-margen); bottom: var(--pag-margen);
+  right: var(--pag-margen); width: 1px;
+  background: rgba(43,108,184,.12); pointer-events: none;
+  z-index: 1;
+}
+.pagina::after {  /* número de página (pseudo-elemento: no interfiere con la edición) */
   content: attr(data-numero); position: absolute; right: 10px; bottom: 6px;
   font-size: 9.5px; color: #a5b0c5; font-family: "Segoe UI", sans-serif;
-  pointer-events: none;
+  pointer-events: none; z-index: 2;
 }
 /* Encabezado y pie de página */
 .pag-encabezado, .pag-pie {
@@ -144,7 +160,7 @@ select { height: 24px; border: 1px solid var(--gris-borde); background: rgba(255
 .pi-etiqueta { width: 52px; font-weight: 600; font-size: 11.5px; }
 #imgAncho { width: 130px; accent-color: #2b6cb8; }
 #imgAnchoValor { width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
-.pagina :is(p, h1, h2, h3, h4, blockquote, pre, ul, ol, table) { margin-bottom: 10px; }
+.pagina :is(p, h1, h2, h3, h4, blockquote, pre, ul, ol, table) { margin-bottom: 10px; overflow-wrap: break-word; word-wrap: break-word; }
 .pagina h1 { font-size: 24pt; color: #1e4f8c; font-weight: 600; }
 .pagina h2 { font-size: 18pt; color: #2b6cb8; font-weight: 600; }
 .pagina h3 { font-size: 14pt; color: #2b6cb8; font-weight: 600; }
@@ -229,7 +245,7 @@ select { height: 24px; border: 1px solid var(--gris-borde); background: rgba(255
     page-break-after: always; overflow: hidden;
   }
   .pagina:last-child { page-break-after: avoid; }
-  .pagina::after { content: none; }
+  .pagina::after, .pagina::before { content: none; }
   .pagina img.img-sel { outline: none; box-shadow: none; }
   .pagina .salto-pagina { border: none; margin: 0; }
 }
@@ -250,4 +266,28 @@ select { height: 24px; border: 1px solid var(--gris-borde); background: rgba(255
 @media (max-width: 880px) {
   #regla { display: none; }
   #areaDoc { padding-top: 10px; }
+}
+
+/* ===== Regla vertical (eje Y) ===== */
+#reglaVertical {
+  position: sticky; top: 38px; align-self: flex-start;
+  width: 24px;
+  margin: 0 4px 0 0; flex: 0 0 auto;
+  background: linear-gradient(160deg, rgba(255,255,255,.9), rgba(238,245,255,.85));
+  backdrop-filter: blur(10px);
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.8);
+  box-shadow: 0 3px 12px rgba(40, 70, 130, .12);
+  font-size: 9px; color: #667;
+  overflow: hidden;
+  user-select: none;
+}
+#reglaVertical .margenV { position: absolute; left: 0; width: 100%; background: rgba(43,108,184,.10); }
+#reglaVertical .marcaV { position: absolute; left: 0; width: 100%; }
+#reglaVertical .marcaV::before { content: ''; position: absolute; bottom: 0; right: 0; width: 8px; height: 1px; background: #8aa; }
+#reglaVertical .marcaV.media::before { width: 5px; }
+#reglaVertical .marcaV span { position: absolute; right: 9px; bottom: 1px; }
+#reglaVertical .marcaV.centimetro { color: #556; }
+@media (max-width: 880px) {
+  #reglaVertical { display: none; }
 }

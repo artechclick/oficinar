@@ -372,6 +372,46 @@ ipcMain.on('ia-abrir-app-con', (_e, { aplicacion, contenido }) => {
   });
 });
 
+// Asociación de archivos: abre la app correcta con el archivo indicado (sin diálogo)
+const EXTENSIONES_APP = {
+  // Hojas de cálculo → Calcular
+  '.calc': 'calcular', '.xlsx': 'calcular', '.xlsm': 'calcular', '.xls': 'calcular',
+  '.ods': 'calcular', '.xlsb': 'calcular', '.csv': 'calcular', '.tsv': 'calcular',
+  // Documentos de texto → Escribir
+  '.escrito': 'escribir', '.docx': 'escribir', '.txt': 'escribir', '.md': 'escribir',
+  '.html': 'escribir', '.htm': 'escribir', '.rtf': 'escribir',
+  // Presentaciones → Presentar
+  '.presentacion': 'presentar', '.pptx': 'presentar',
+  // PDF → Editar PDF
+  '.pdf': 'editarpdf'
+};
+
+ipcMain.on('abrir-app-con-archivo', (_e, { appId, ruta }) => {
+  const win = abrirApp(appId);
+  if (!win) return;
+  win.webContents.once('did-finish-load', () => {
+    if (!win.isDestroyed()) win.webContents.send('abrir-archivo-recibido', ruta);
+  });
+});
+
+function abrirArchivoExterno(ruta) {
+  const ext = path.extname(ruta).toLowerCase();
+  const appId = EXTENSIONES_APP[ext];
+  if (!appId) {
+    dialog.showErrorBox('Archivo no compatible', `Oficinar no puede abrir archivos con extensión "${ext}".`);
+    return;
+  }
+  abrirAppConArchivo(appId, ruta);
+}
+
+function abrirAppConArchivo(appId, ruta) {
+  const win = abrirApp(appId);
+  if (!win) return;
+  win.webContents.once('did-finish-load', () => {
+    if (!win.isDestroyed()) win.webContents.send('abrir-archivo-recibido', ruta);
+  });
+}
+
 ipcMain.on('abrir-app', (_e, id) => abrirApp(id));
 ipcMain.on('set-dirty', (e, dirty) => { const w = deEvento(e); if (w) w._dirty = dirty; });
 ipcMain.on('set-title', (e, t) => { const w = deEvento(e); if (w) w.setTitle(t); });
@@ -608,16 +648,76 @@ ipcMain.handle('ia-chat', async (_e, { proveedor, apiKey, modelo, sistema, mensa
   }
 });
 
+// ---------- Asociación de archivos (segunda instancia) ----------
+// Debe llamarse antes de app.whenReady()
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) { app.quit(); }
+else {
+  app.on('second-instance', (_e, argv) => {
+    const archivo = archivoDeArgv(argv);
+    if (archivo) abrirArchivoExterno(archivo);
+    else abrirApp('launcher');
+  });
+}
+
+// macOS: cuando se abre un archivo con doble clic desde el Finder
+app.on('open-file', (e, ruta) => {
+  e.preventDefault();
+  if (app.isReady()) {
+    abrirArchivoExterno(ruta);
+  } else {
+    app.whenReady().then(() => abrirArchivoExterno(ruta));
+  }
+});
+
 // ---------- Ciclo de vida ----------
 app.whenReady().then(() => {
   configurarOrtografia();
   configurarPermisos();
   if (process.env.OFICINAR_TEST) { pruebaArranque(); return; }
-  abrirApp('launcher');
+  if (process.env.OFICINAR_TEST_OPEN) {
+    // Prueba de enrutamiento de apertura: abre el archivo y reporta qué app lo recibió
+    const rutas = process.env.OFICINAR_TEST_OPEN.split('|');
+    for (const r of rutas) abrirArchivoExterno(r);
+    setTimeout(async () => {
+      for (const w of BrowserWindow.getAllWindows()) {
+        try {
+          const url = w.webContents.getURL();
+          const m = /\/apps\/([^/]+)\//.exec(url);
+          const appId = m ? m[1] : (url.includes('launcher') ? 'launcher' : '?');
+          let contenido = '';
+          try {
+            if (appId === 'calcular') contenido = await w.webContents.executeJavaScript(`String(hf.getCellValue({sheet:hojaActual,row:0,col:0}))`);
+            else if (appId === 'escribir') contenido = await w.webContents.executeJavaScript(`textoDocumento().slice(0,30)`);
+            else if (appId === 'editarpdf') contenido = await w.webContents.executeJavaScript(`'paginas='+paginas.length`);
+            else if (appId === 'presentar') contenido = await w.webContents.executeJavaScript(`'diapos='+pres.diapositivas.length`);
+          } catch (e) { contenido = 'err:' + e.message; }
+          console.log('[ABRIR] ' + appId + ' | contenido="' + contenido + '"');
+        } catch (e) { /* */ }
+      }
+      app.exit(0);
+    }, 3000);
+    return;
+  }
+  // ¿Se lanzó con un archivo (doble clic / "Abrir con Oficinar")? Abrir su app directamente.
+  const archivo = archivoDeArgv(process.argv);
+  if (archivo) abrirArchivoExterno(archivo);
+  else abrirApp('launcher');
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) abrirApp('launcher');
   });
 });
+
+// Busca en los argumentos el primer archivo existente con extensión compatible
+function archivoDeArgv(argv) {
+  for (const arg of argv.slice(1)) {
+    if (!arg || arg.startsWith('-')) continue;
+    try {
+      if (fs.existsSync(arg) && fs.statSync(arg).isFile()) return arg;
+    } catch (e) { /* no es una ruta válida */ }
+  }
+  return null;
+}
 
 // Prueba de humo: abre todas las apps, reporta errores de consola y termina
 function pruebaArranque() {

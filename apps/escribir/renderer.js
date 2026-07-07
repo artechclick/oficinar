@@ -100,41 +100,101 @@ function establecerHTML(html) {
 
 // ---------- Paginación automática ----------
 const ETIQUETAS_INLINE = ['B', 'I', 'U', 'S', 'A', 'SPAN', 'FONT', 'IMG', 'CODE', 'SUB', 'SUP', 'BR', 'EM', 'STRONG', 'MARK', 'SMALL'];
+const ETIQUETAS_BLOQUE = ['P', 'H1', 'H2', 'H3', 'H4', 'LI', 'BLOCKQUOTE', 'PRE', 'TABLE', 'DIV'];
 
 function esDecoracion(n) {
-  return n && n.nodeType === 1 && (n.classList.contains('pag-encabezado') || n.classList.contains('pag-pie'));
+  return n && n.nodeType === 1 && (
+    n.classList.contains('pag-encabezado') || n.classList.contains('pag-pie') ||
+    n.classList.contains('pag-num') || n.classList.contains('notas-pie-cont'));
 }
-function normalizarPagina(p) {
-  // Envolver texto e inlines sueltos en párrafos para poder moverlos entre páginas
-  let n = p.firstChild;
-  while (n) {
-    const sig = n.nextSibling;
-    if (esDecoracion(n)) { n = sig; continue; }
-    if (n.nodeType === 3 && !n.textContent.trim()) { n.remove(); n = sig; continue; }
-    const esInline = n.nodeType === 3 || (n.nodeType === 1 && ETIQUETAS_INLINE.includes(n.tagName));
-    if (esInline) {
-      const envoltura = document.createElement('p');
-      p.insertBefore(envoltura, n);
-      let m = n;
-      while (m) {
-        const s2 = m.nextSibling;
-        const esIn = m.nodeType === 3 || (m.nodeType === 1 && ETIQUETAS_INLINE.includes(m.tagName));
-        if (!esIn) break;
-        envoltura.appendChild(m);
-        m = s2;
-      }
-      n = envoltura.nextSibling;
-    } else {
-      n = sig;
-    }
-  }
+function esBloqueEstandar(n) {
+  return n && n.nodeType === 1 && /^(P|H1|H2|H3|H4|H5|H6|UL|OL|BLOCKQUOTE|PRE|TABLE|HR|FIGURE)$/.test(n.tagName);
+}
+// Bloques con clase propia de la app que deben conservarse intactos (no aplanar)
+function esBloqueProtegido(n) {
+  return n && n.nodeType === 1 && n.classList && (
+    n.classList.contains('toc') || n.classList.contains('salto-pagina'));
+}
+function esBloque(n) {
+  return n && n.nodeType === 1 && ETIQUETAS_BLOQUE.includes(n.tagName);
+}
+function esSaltoPagina(n) {
+  return n && n.nodeType === 1 && n.classList && n.classList.contains('salto-pagina');
 }
 
-const desborda = (p) => p.scrollHeight > p.clientHeight + 1;
+// Aplana y normaliza los hijos directos de una página en bloques distribuibles:
+// desenvuelve DIV/SECTION que contienen bloques, convierte DIV inline en <p>,
+// y envuelve texto/inline sueltos en <p>. Así el contenido pegado/importado
+// (que suele venir en un <div> gigante) se divide en bloques que sí paginan.
+const CONTENEDORES = ['DIV', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER', 'MAIN', 'ASIDE', 'NAV', 'FORM'];
+function normalizarPagina(p) {
+  let n = p.firstChild;
+  let guard = 0;
+  while (n && guard++ < 200000) {
+    const sig = n.nextSibling;
+    if (esDecoracion(n) || esSaltoPagina(n)) { n = sig; continue; }
+
+    // Nodo de texto suelto: envolver (junto a los inline siguientes) en <p>
+    if (n.nodeType === 3) {
+      if (!n.textContent.trim()) { n.remove(); n = sig; continue; }
+      n = envolverInline(p, n); continue;
+    }
+    if (n.nodeType !== 1) { n = sig; continue; }
+
+    const tag = n.tagName;
+    if (esBloqueEstandar(n) || esBloqueProtegido(n)) { n = sig; continue; }
+
+    // Inline suelto a nivel de página: envolver en <p>
+    if (ETIQUETAS_INLINE.includes(tag)) { n = envolverInline(p, n); continue; }
+
+    // Contenedor (div, section...): aplanar o convertir
+    if (CONTENEDORES.includes(tag)) {
+      const hijos = [...n.childNodes];
+      const tieneBloque = hijos.some(c => c.nodeType === 1 &&
+        (esBloqueEstandar(c) || esSaltoPagina(c) || CONTENEDORES.includes(c.tagName)));
+      if (tieneBloque) {
+        // Desenvolver: subir los hijos al nivel de la página y reprocesarlos
+        const primero = n.firstChild;
+        while (n.firstChild) p.insertBefore(n.firstChild, n);
+        n.remove();
+        n = primero || sig; continue;
+      } else {
+        // Solo inline: convertir el div en <p> conservando la alineación
+        const env = document.createElement('p');
+        if (n.style && n.style.textAlign) env.style.textAlign = n.style.textAlign;
+        while (n.firstChild) env.appendChild(n.firstChild);
+        n.replaceWith(env);
+        n = env.nextSibling; continue;
+      }
+    }
+    // Otro elemento (p.ej. figure ya cubierto): dejar como bloque
+    n = sig;
+  }
+}
+function envolverInline(p, n) {
+  const env = document.createElement('p');
+  p.insertBefore(env, n);
+  let m = n;
+  while (m && (m.nodeType === 3 || (m.nodeType === 1 && ETIQUETAS_INLINE.includes(m.tagName)))) {
+    const s2 = m.nextSibling; env.appendChild(m); m = s2;
+  }
+  return env.nextSibling;
+}
+
+// ¿El contenido de la página supera el área útil (altura menos márgenes vertical)?
+// Se mide con offset (fiable con zoom) en vez de scrollHeight (que ignora el padding inferior).
+function desborda(p) {
+  const bloques = bloquesEn(p);
+  if (bloques.length <= 1) return false;
+  const ratioMargen = formatoPagina.margen / dimensionesPagina().h;
+  const fondoUtil = p.clientHeight * (1 - ratioMargen);
+  const ultimo = bloques[bloques.length - 1];
+  return (ultimo.offsetTop + ultimo.offsetHeight) > fondoUtil + 0.5;
+}
 
 function capturarCaret() {
   const s = window.getSelection();
-  if (s.rangeCount && marco.contains(s.anchorNode)) return s.getRangeAt(0);
+  if (s.rangeCount && marco.contains(s.anchorNode)) return s.getRangeAt(0).cloneRange();
   return null;
 }
 function restaurarCaret(r) {
@@ -148,74 +208,223 @@ function restaurarCaret(r) {
   } catch (e) { /* el nodo pudo desaparecer */ }
 }
 
-let timerRepag = null;
-function repaginarPronto() { clearTimeout(timerRepag); timerRepag = setTimeout(repaginar, 160); }
+function forzarReflow(el) {
+  if (el) void el.offsetHeight;
+}
 
+let rafRepag = null;
+let repagPendiente = false;
+function repaginarPronto() {
+  repagPendiente = true;
+  if (rafRepag) return;
+  const loop = () => {
+    rafRepag = null;
+    if (repagPendiente) {
+      repagPendiente = false;
+      try { repaginar(); } catch (e) { console.error('repaginar error:', e); }
+      if (repagPendiente) rafRepag = requestAnimationFrame(loop);
+    }
+  };
+  rafRepag = requestAnimationFrame(loop);
+}
+
+// Recolecta bloques del documento agrupando listas (ul/ol) como un solo bloque
+function recolectarBloques() {
+  if (paginasDoc().length === 0) return [];
+
+  // Primero, normalizar: envolver text nodes sueltos en párrafos, quitar br sueltos
+  for (const pg of paginasDoc()) {
+    let n = pg.firstChild;
+    while (n) {
+      const sig = n.nextSibling;
+      if (esDecoracion(n)) { n = sig; continue; }
+      if (esSaltoPagina(n)) { n = sig; continue; }
+      // Text node suelto: envolver en <p>
+      if (n.nodeType === 3) {
+        if (!n.textContent.trim()) { n.remove(); n = sig; continue; }
+        const p = document.createElement('p');
+        pg.insertBefore(p, n);
+        p.appendChild(n);
+        n = p.nextSibling;
+        continue;
+      }
+      // <br> suelto: quitar (será reemplazado por un espacio en el párrafo siguiente)
+      if (n.tagName === 'BR' && pg === n.parentNode) {
+        n.remove();
+        n = sig;
+        continue;
+      }
+      // <div> o contenedor que solo tiene texto suelto: convertir a <p>
+      if ((n.tagName === 'DIV') && n.childNodes.length > 0) {
+        const tieneInline = [...n.childNodes].some(c => c.nodeType === 3 || (c.nodeType === 1 && ETIQUETAS_INLINE.includes(c.tagName)));
+        const tieneBloque = [...n.children].some(c => ETIQUETAS_BLOQUE.includes(c.tagName));
+        if (tieneInline && !tieneBloque) {
+          const p = document.createElement('p');
+          pg.insertBefore(p, n);
+          while (n.firstChild) p.appendChild(n.firstChild);
+          n.remove();
+          n = p.nextSibling;
+          continue;
+        }
+      }
+      n = sig;
+    }
+  }
+
+  // Recolectar todos los hijos directos no-decoración
+  const bloques = [];
+  for (const pg of paginasDoc()) {
+    for (const child of [...pg.children]) {
+      if (esDecoracion(child)) continue;
+      bloques.push(child);
+      pg.removeChild(child);
+    }
+  }
+  // Agrupar listas consecutivas
+  const grupos = [];
+  let actual = null;
+  for (const b of bloques) {
+    // Eliminar divs completamente vacíos
+    if (b.tagName === 'DIV' && !b.textContent.trim() && !b.querySelector('img, table, hr.salto-pagina')) {
+      b.remove();
+      continue;
+    }
+    if (actual && (actual.tagName === 'UL' || actual.tagName === 'OL') && b.tagName === actual.tagName) {
+      while (b.firstChild) actual.appendChild(b.firstChild);
+      b.remove();
+    } else {
+      grupos.push(b);
+      actual = b;
+    }
+  }
+  return grupos;
+}
+
+// Paginación INCREMENTAL: solo mueve los bloques del borde entre páginas adyacentes.
+// Ventajas: no reconstruye el documento (el cursor se conserva porque los nodos no se
+// destruyen, solo se mueven) y es rápido en vivo (normalmente 0-1 movimientos por tecla).
 function repaginar() {
-  clearTimeout(timerRepag);
+  repagPendiente = false;
+  if (paginasDoc().length === 0) marco.appendChild(crearPagina());
+
   const caret = capturarCaret();
 
-  // Quitar encabezados/pies antes de redistribuir bloques: si se quedan, el manejo de
-  // saltos de página los arrastra a otras páginas y se duplican/desordenan.
-  marco.querySelectorAll('.pag-encabezado, .pag-pie').forEach(d => d.remove());
+  // Quitar decoraciones (encabezado/pie) para que no cuenten como bloques al balancear.
+  // El número de página se muestra con el pseudo-elemento .pagina::after (data-numero),
+  // así NO hay un nodo no editable que estorbe al escribir al final de la hoja.
+  marco.querySelectorAll('.pag-encabezado, .pag-pie, .pag-num').forEach(d => d.remove());
 
-  for (let i = 0; i < 400; i++) {
-    const pgs = paginasDoc();
-    if (i >= pgs.length) break;
-    const p = pgs[i];
-    normalizarPagina(p);
-    if (!p.firstElementChild) p.innerHTML = '<p><br></p>';
+  // Aplanar/normalizar cada página en bloques distribuibles
+  paginasDoc().forEach(normalizarPagina);
 
-    // Salto de página forzado: todo lo que sigue pasa a la página siguiente
-    const salto = p.querySelector(':scope > .salto-pagina, :scope > hr.salto-pagina');
+  // Balancear páginas de izquierda a derecha
+  let i = 0, vueltas = 0;
+  while (i < paginasDoc().length && vueltas++ < 5000) {
+    const p = paginasDoc()[i];
+
+    // Salto de página forzado: mover lo que está después del salto a la página siguiente
+    const salto = p.querySelector(':scope > .salto-pagina');
     if (salto && salto.nextSibling) {
       const resto = [];
-      let n = salto.nextSibling;
-      while (n) { resto.push(n); n = n.nextSibling; }
+      let x = salto.nextSibling;
+      while (x) { resto.push(x); x = x.nextSibling; }
       const sig = obtenerPagina(i + 1);
       for (let k = resto.length - 1; k >= 0; k--) sig.insertBefore(resto[k], sig.firstChild);
     }
 
-    // Empujar los bloques que desbordan hacia la página siguiente (sin contar decoraciones)
-    let guardia = 0;
-    while (desborda(p) && bloquesEn(p).length > 1 && guardia++ < 600) {
+    // Empujar bloques que desbordan hacia la página siguiente
+    let g = 0;
+    while (desborda(p) && bloquesEn(p).length > 1 && g++ < 5000) {
       const sig = obtenerPagina(i + 1);
-      sig.insertBefore(ultimoBloque(p), primerBloque(sig) || null);
+      sig.insertBefore(ultimoBloque(p), sig.firstChild);
     }
 
     // Subir bloques de la página siguiente mientras quepan (y no haya salto forzado)
-    guardia = 0;
-    while (guardia++ < 600) {
-      const ultimo = ultimoBloque(p);
-      if (ultimo && ultimo.classList && ultimo.classList.contains('salto-pagina')) break;
+    g = 0;
+    while (g++ < 5000) {
       const sig = paginasDoc()[i + 1];
       if (!sig) break;
+      const ult = ultimoBloque(p);
+      if (ult && esSaltoPagina(ult)) break;         // hay un salto: no subir más
       const primero = primerBloque(sig);
-      if (!primero) { if (!bloquesEn(sig).length) sig.remove(); break; }
-      const anclaPie = sig.querySelector(':scope > .pag-pie');
-      p.insertBefore(primero, p.querySelector(':scope > .pag-pie') || null);
-      if (desborda(p)) { sig.insertBefore(primero, primerBloque(sig) || null); break; }
+      if (!primero) { if (bloquesEn(sig).length === 0) sig.remove(); break; }
+      if (esSaltoPagina(primero)) break;            // el siguiente bloque es un salto: arranca su página
+      p.appendChild(primero);
+      if (desborda(p)) { sig.insertBefore(primero, sig.firstChild); break; }
     }
+
+    i++;
   }
 
-  // Quitar páginas vacías del final (siempre queda al menos una)
+  // Quitar páginas finales vacías (siempre queda al menos una)
   let pgs = paginasDoc();
   while (pgs.length > 1) {
     const u = pgs[pgs.length - 1];
-    const bloques = bloquesEn(u);
-    const vacia = bloques.length === 0 || (bloques.length === 1 && !u.textContent.trim() && !u.querySelector('img, table, hr'));
-    if (vacia) { u.remove(); pgs = paginasDoc(); }
-    else break;
+    const b = bloquesEn(u);
+    const vacia = b.length === 0 || (b.length === 1 && !u.textContent.trim() && !u.querySelector('img, table, hr.salto-pagina'));
+    if (vacia) { u.remove(); pgs = paginasDoc(); } else break;
   }
 
-  // Numerar páginas
+  // La primera página siempre tiene al menos un párrafo editable
+  const prim = paginasDoc()[0];
+  if (prim && !bloquesEn(prim).length) {
+    const pv = document.createElement('p'); pv.appendChild(document.createElement('br')); prim.appendChild(pv);
+  }
+
+  // Numerar páginas (mediante el atributo data-numero → pseudo-elemento CSS ::after)
   const total = paginasDoc().length;
   paginasDoc().forEach((p, k) => { p.dataset.numero = `${k + 1} / ${total}`; });
 
   actualizarEncabezadosPies();
   if (formatoPagina.columnas > 1) aplicarColumnas();
+
+  // Restaurar el cursor: el rango sigue siendo válido porque solo movimos nodos
   restaurarCaret(caret);
   actualizarEstadoPaginas();
+}
+
+// Calcula el offset en texto plano del cursor dentro del documento
+function textoOffsetDeRango(rango) {
+  if (!rango || !marco.contains(rango.startContainer)) return -1;
+  let offset = 0;
+  const walker = document.createTreeWalker(marco, NodeFilter.SHOW_TEXT);
+  let nodo;
+  while ((nodo = walker.nextNode())) {
+    if (rango.startContainer === nodo) {
+      offset += rango.startOffset;
+      return offset;
+    }
+    offset += nodo.nodeValue.length;
+  }
+  return -1;
+}
+
+// Encuentra el rango correspondiente a un offset de texto plano
+function rangoDesdeTextoOffset(targetOffset) {
+  if (targetOffset < 0) return null;
+  let offset = 0;
+  const walker = document.createTreeWalker(marco, NodeFilter.SHOW_TEXT);
+  let nodo;
+  let lastNode = null;
+  while ((nodo = walker.nextNode())) {
+    const len = nodo.nodeValue.length;
+    if (offset + len >= targetOffset) {
+      const r = document.createRange();
+      r.setStart(nodo, targetOffset - offset);
+      r.setEnd(nodo, targetOffset - offset);
+      return r;
+    }
+    offset += len;
+    lastNode = nodo;
+  }
+  // Si el offset está al final, posicionar al final del último nodo
+  if (lastNode) {
+    const r = document.createRange();
+    r.setStart(lastNode, lastNode.nodeValue.length);
+    r.setEnd(lastNode, lastNode.nodeValue.length);
+    return r;
+  }
+  return null;
 }
 
 // Bloques de flujo de una página (excluye encabezado/pie)
@@ -234,29 +443,61 @@ function actualizarEstadoPaginas() {
   $('estadoPaginas').textContent = `Página ${actual} de ${pgs.length}`;
 }
 
-// Retroceso al inicio de una página: pasar al final de la anterior
+// Maneja teclas especiales (Enter, Backspace, etc.) que afectan la paginación
 marco.addEventListener('keydown', (e) => {
-  if (e.key !== 'Backspace') return;
-  const s = window.getSelection();
-  if (!s.rangeCount || !s.isCollapsed) return;
-  const r = s.getRangeAt(0);
-  const p = paginaDe(r.startContainer);
-  if (!p) return;
-  const pgs = paginasDoc();
-  const idx = pgs.indexOf(p);
-  if (idx <= 0) return;
-  const antes = document.createRange();
-  antes.selectNodeContents(p);
-  antes.setEnd(r.startContainer, r.startOffset);
-  if (antes.toString() !== '' || antes.cloneContents().querySelector('img, table')) return;
-  e.preventDefault();
-  const prev = pgs[idx - 1];
-  prev.focus({ preventScroll: true });
-  const fin = document.createRange();
-  fin.selectNodeContents(prev);
-  fin.collapse(false);
-  s.removeAllRanges(); s.addRange(fin);
-  guardarRango();
+  // Backspace al inicio de página: pasar al final de la página anterior y fusionar
+  if (e.key === 'Backspace') {
+    const s = window.getSelection();
+    if (!s.rangeCount || !s.isCollapsed) return;
+    const r = s.getRangeAt(0);
+    const p = paginaDe(r.startContainer);
+    if (!p) return;
+    const pgs = paginasDoc();
+    const idx = pgs.indexOf(p);
+    if (idx <= 0) return;
+    const antes = document.createRange();
+    antes.selectNodeContents(p);
+    antes.setEnd(r.startContainer, r.startOffset);
+    if (antes.toString() !== '' || antes.cloneContents().querySelector('img, table')) return;
+    e.preventDefault();
+    const prev = pgs[idx - 1];
+    prev.focus({ preventScroll: true });
+    const fin = document.createRange();
+    fin.selectNodeContents(prev);
+    fin.collapse(false);
+    s.removeAllRanges(); s.addRange(fin);
+    guardarRango();
+    repaginarPronto();
+    return;
+  }
+  // Enter: ejecutar paginación inmediata y scroll al cursor
+  if (e.key === 'Enter' && !e.shiftKey) {
+    const s = window.getSelection();
+    if (!s.rangeCount) return;
+    const r = s.getRangeAt(0);
+    const p = paginaDe(r.startContainer);
+    if (!p) return;
+    const pgs = paginasDoc();
+    const idx = pgs.indexOf(p);
+    // Si no es la última página, deja que el navegador cree el bloque
+    // y despues la paginación reorganizará
+    setTimeout(() => {
+      repaginar();
+      // Scroll al cursor para mantenerlo visible
+      const sel = window.getSelection();
+      if (sel.rangeCount) {
+        const rr = sel.getRangeAt(0);
+        const cont = rr.startContainer;
+        if (cont.nodeType === 1) {
+          const r2 = cont.getBoundingClientRect();
+          if (r2.top > window.innerHeight - 100) {
+            const nuevaPag = paginaDe(cont);
+            if (nuevaPag) nuevaPag.scrollIntoView({ block: 'start', behavior: 'smooth' });
+          }
+        }
+      }
+    }, 0);
+  }
 });
 
 // ---------- Utilidades ----------
@@ -325,6 +566,38 @@ function construirRegla(ancho, margen) {
     if (cm % 2 === 0) marca.innerHTML = `<span>${cm}</span>`;
     regla.appendChild(marca);
   }
+  if (typeof construirReglaVertical === 'function') {
+    const d = dimensionesPagina();
+    const margenV = formatoPagina.margen;
+    construirReglaVertical(d.h, margenV);
+  }
+}
+
+// ---------- Regla vertical (eje Y) ----------
+function construirReglaVertical(alto, margen) {
+  const regla = $('reglaVertical');
+  if (!regla) return;
+  regla.innerHTML = '';
+  regla.style.height = ((alto || 1056)) + 'px';
+  const margenes = alto - margen * 2;
+  const mSup = document.createElement('div');
+  mSup.className = 'margenV margen-sup';
+  mSup.style.top = '0';
+  mSup.style.height = (margen || 96) + 'px';
+  regla.appendChild(mSup);
+  const mInf = document.createElement('div');
+  mInf.className = 'margenV margen-inf';
+  mInf.style.bottom = '0';
+  mInf.style.height = (margen || 96) + 'px';
+  regla.appendChild(mInf);
+  const PX_CM = 37.8;
+  for (let cm = 1; cm * PX_CM < (alto || 1056); cm++) {
+    const marca = document.createElement('div');
+    marca.className = 'marcaV' + (cm % 2 ? ' media' : '') + ' centimetro';
+    marca.style.top = (cm * PX_CM) + 'px';
+    if (cm % 2 === 0) marca.innerHTML = `<span>${cm}</span>`;
+    regla.appendChild(marca);
+  }
 }
 
 // ---------- Fuentes (todas las instaladas en el equipo) ----------
@@ -378,14 +651,26 @@ function pegarPortapapeles() {
   if (p) p.focus({ preventScroll: true });
   restaurarRango();
   const html = clipboard.readHTML();
-  if (html && html.trim()) document.execCommand('insertHTML', false, html);
-  else {
+  if (html && html.trim()) {
+    // Limpiar HTML del portapapeles
+    const docTemp = new DOMParser().parseFromString('<div>' + html + '</div>', 'text/html');
+    const limpio = normalizarHTMLImportado(docTemp.body.firstChild ? docTemp.body.firstChild.innerHTML : '');
+    document.execCommand('insertHTML', false, limpio);
+  } else {
     const t = clipboard.readText();
-    if (t) document.execCommand('insertText', false, t);
+    if (t) {
+      // Convertir saltos de línea en párrafos
+      const lineas = t.split(/\r?\n/);
+      const htmlP = lineas.map(l => {
+        const contenido = l.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+        return contenido ? `<p>${contenido}</p>` : '<p><br></p>';
+      }).join('');
+      document.execCommand('insertHTML', false, htmlP);
+    }
   }
   guardarRango();
   marcarModificado();
-  repaginarPronto();
+  repaginar();
 }
 
 $('btnDeshacer').addEventListener('click', () => exec('undo'));
@@ -510,6 +795,33 @@ marco.addEventListener('input', () => {
   marcarModificado();
   actualizarStats();
   repaginarPronto();
+});
+
+// Interceptar el pegado nativo (Ctrl+V) para limpiar y aplanar el contenido:
+// sin esto, se inserta el HTML crudo del origen (a menudo un <div> gigante con estilos)
+// que la paginación no puede dividir y todo queda en una sola hoja.
+marco.addEventListener('paste', (e) => {
+  e.preventDefault();
+  const dt = e.clipboardData;
+  if (!dt) return;
+  const p = paginaActiva(); if (p) p.focus({ preventScroll: true });
+  let insertado = false;
+  const html = dt.getData('text/html');
+  if (html && html.trim()) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const limpio = normalizarHTMLImportado(doc.body ? doc.body.innerHTML : html);
+    document.execCommand('insertHTML', false, limpio);
+    insertado = true;
+  } else {
+    const txt = dt.getData('text/plain');
+    if (txt) {
+      const htmlP = txt.split(/\r?\n/).map(l =>
+        l.trim() ? `<p>${l.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</p>` : '<p><br></p>').join('');
+      document.execCommand('insertHTML', false, htmlP);
+      insertado = true;
+    }
+  }
+  if (insertado) { guardarRango(); marcarModificado(); actualizarStats(); repaginar(); }
 });
 
 // ---------- Imagen: selección y configuración ----------
@@ -935,12 +1247,10 @@ async function abrirRuta(ruta) {
       const mammoth = require('mammoth');
       const r = await mammoth.convertToHtml({ path: ruta }, {
         includeDefaultStyleMap: true,
-        // Insertar las imágenes del documento como data URI
         convertImage: mammoth.images.imgElement(async (image) => {
           const b64 = await image.read('base64');
           return { src: `data:${image.contentType};base64,${b64}` };
         }),
-        // Adaptar estilos de párrafo de Word a los de la app
         styleMap: [
           "p[style-name='Title'] => h1:fresh",
           "p[style-name='Subtitle'] => h2:fresh",
@@ -957,13 +1267,18 @@ async function abrirRuta(ruta) {
           "u => u"
         ]
       });
-      establecerHTML(r.value || '<p><br></p>');
+      establecerHTML(normalizarHTMLImportado(r.value || '<p><br></p>'));
     } else if (ext === '.html' || ext === '.htm') {
       const doc = new DOMParser().parseFromString(fs.readFileSync(ruta, 'utf8'), 'text/html');
-      establecerHTML(doc.body.innerHTML || '<p><br></p>');
+      establecerHTML(normalizarHTMLImportado(doc.body.innerHTML || '<p><br></p>'));
     } else {
       const texto = fs.readFileSync(ruta, 'utf8');
-      establecerHTML(texto.split(/\r?\n/).map(l => `<p>${l.replace(/&/g, '&amp;').replace(/</g, '&lt;') || '<br>'}</p>`).join(''));
+      const lineas = texto.split(/\r?\n/);
+      const htmlP = lineas.map(l => {
+        const contenido = l.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+        return contenido ? `<p>${contenido}</p>` : '<p><br></p>';
+      }).join('');
+      establecerHTML(htmlP);
     }
     archivoActual = (ext === '.escrito') ? ruta : null; // otros formatos se guardan luego como .escrito
     limpiarModificado();
@@ -1096,6 +1411,14 @@ ipcRenderer.on('menu', async (_e, accion) => {
   }
 });
 
+// Recepción de archivo desde asociación (sin diálogo)
+ipcRenderer.on('abrir-archivo-recibido', async (_e, ruta) => {
+  if (ruta && typeof ruta === 'string') {
+    if (!await confirmarPerdida()) return;
+    await abrirRuta(ruta);
+  }
+});
+
 // Atajos locales estilo Word en español
 document.addEventListener('keydown', (e) => {
   if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
@@ -1129,6 +1452,66 @@ function markdownAHTML(md) {
   cerrarListas();
   if (enPre) html += '</pre>';
   return html || '<p><br></p>';
+}
+
+// Normaliza HTML importado (mammoth o pegado) para que respete el line-height de la app y detecta saltos de página
+function normalizarHTMLImportado(html) {
+  if (!html || !html.trim()) return '<p><br></p>';
+  // Parsear como fragmento HTML
+  const tmpl = document.createElement('template');
+  tmpl.innerHTML = html;
+
+  // Si solo hay texto suelto, envolver en <p>
+  const fragment = tmpl.content;
+  const soloTexto = fragment.childNodes.length === 1 && fragment.firstChild.nodeType === 3;
+  if (soloTexto) {
+    const p = document.createElement('p');
+    p.textContent = fragment.firstChild.textContent;
+    while (fragment.firstChild) fragment.removeChild(fragment.firstChild);
+    fragment.appendChild(p);
+  }
+
+  const pageBreaks = [];
+  fragment.querySelectorAll('*').forEach(el => {
+    el.removeAttribute('width');
+    el.removeAttribute('height');
+    const style = el.getAttribute('style') || '';
+    const partes = style.split(';').filter(s => s.trim());
+    const nuevoStyle = [];
+    for (const p of partes) {
+      const m = /^([\w-]+)\s*:\s*(.+)$/.exec(p.trim());
+      if (!m) continue;
+      const prop = m[1].toLowerCase(), val = m[2].trim();
+      if (prop === 'page-break-after' || prop === 'page-break-before') {
+        if (val === 'always' || val === 'page') {
+          pageBreaks.push(el);
+          return;
+        }
+      }
+      // Solo conservar estilos que no afecten el layout de página
+      if (prop === 'font-size' || prop === 'font-weight' || prop === 'font-style' ||
+          prop === 'color' || prop === 'background-color' || prop === 'background' ||
+          prop === 'text-align' || prop === 'vertical-align' ||
+          prop === 'text-decoration') {
+        nuevoStyle.push(`${prop}:${val}`);
+      }
+    }
+    el.removeAttribute('style');
+    if (nuevoStyle.length) el.setAttribute('style', nuevoStyle.join(';'));
+  });
+
+  // Reemplazar elementos de salto de página
+  for (const el of pageBreaks) {
+    if (!el.parentNode) continue;
+    const hr = document.createElement('hr');
+    hr.className = 'salto-pagina';
+    el.replaceWith(hr);
+  }
+
+  // Serializar el contenido de vuelta a HTML
+  const div = document.createElement('div');
+  div.appendChild(fragment.cloneNode(true));
+  return div.innerHTML;
 }
 
 // ---------- Integración con el Asistente IA ----------

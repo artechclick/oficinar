@@ -1271,6 +1271,28 @@ ipcRenderer.on('menu', async (_e, accion) => {
   }
 });
 
+// Recepción de archivo desde asociación (sin diálogo)
+ipcRenderer.on('abrir-archivo-recibido', async (_e, ruta) => {
+  if (!ruta || typeof ruta !== 'string') return;
+  try {
+    if (!await confirmarPerdida()) return;
+    const ext = require('path').extname(ruta).toLowerCase();
+    if (ext === '.pptx') {
+      const importada = await importarPPTX(ruta);
+      pres = importada; archivoActual = null;
+    } else {
+      const j = JSON.parse(require('fs').readFileSync(ruta, 'utf8'));
+      if (j.tipo !== 'oficinar-presentacion') throw new Error('El archivo no es una presentación de Presentar.');
+      pres = j; archivoActual = ruta;
+    }
+    diapoActual = 0; objSel = null;
+    pilaDeshacer = []; pilaRehacer = [];
+    limpiarModificado(); renderTodo();
+  } catch (err) {
+    await ipcRenderer.invoke('mensaje', { type: 'error', title: 'Presentar', message: 'No se pudo abrir el archivo.', detail: String(err.message || err) });
+  }
+});
+
 document.addEventListener('keydown', (e) => {
   if (enPresentacion) return;
   if (e.key === 'F5') { e.preventDefault(); iniciarPresentacion(e.shiftKey ? diapoActual : 0); }

@@ -1930,6 +1930,11 @@ ipcRenderer.on('menu', async (_e, accion) => {
   }
 });
 
+// Recepción de archivo desde asociación (sin diálogo)
+ipcRenderer.on('abrir-archivo-recibido', async (_e, ruta) => {
+  if (ruta && typeof ruta === 'string') await abrirRuta(ruta);
+});
+
 // ---------- Inicio ----------
 viewport.tabIndex = 0;
 crearHF(null);

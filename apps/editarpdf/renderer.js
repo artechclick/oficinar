@@ -933,6 +933,31 @@ ipcRenderer.on('menu', async (_e, accion) => {
   }
 });
 
+// Recepción de archivo desde asociación (sin diálogo)
+ipcRenderer.on('abrir-archivo-recibido', async (_e, ruta) => {
+  if (ruta && typeof ruta === 'string') {
+    try {
+      nuevoPDF();
+      const bytes = new Uint8Array(fs.readFileSync(ruta));
+      const docJS = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+      fuentes = [{ bytes, docJS }];
+      paginas = [];
+      for (let i = 0; i < docJS.numPages; i++) {
+        const pag = await docJS.getPage(i + 1);
+        const vp = pag.getViewport({ scale: 1 });
+        paginas.push({ src: 0, indice: i, rotExtra: 0, anot: [], ancho: vp.width, alto: vp.height, _pdfPage: pag });
+      }
+      archivoActual = ruta;
+      paginaActual = 0;
+      marcadores = [];
+      limpiarModificado();
+      renderizarTodo();
+    } catch (err) {
+      await ipcRenderer.invoke('mensaje', { type: 'error', title: 'Editar PDF', message: 'No se pudo abrir el PDF.', detail: String(err.message || err) });
+    }
+  }
+});
+
 // ---------- Pestañas de la barra lateral ----------
 document.querySelectorAll('.pestana-lat').forEach(b => b.addEventListener('click', () => {
   document.querySelectorAll('.pestana-lat').forEach(x => x.classList.toggle('activa', x === b));

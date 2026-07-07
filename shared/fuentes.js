@@ -101,14 +101,14 @@ function autocorregirUltimaPalabra(opciones) {
   // Mayúscula al inicio de oración: ". palabra" -> ". Palabra"
   if (conf.capitalizar) {
     const t = nodo.textContent;
-    const antes2 = t.slice(0, sel.anchorOffset);
-    const m2 = /(^|[.!?]\s+)([a-záéíóúñ])([\p{L}]*)([\s ]*)$/u.exec(antes2);
+    const cursorActual = cambio ? nuevaPos : pos;
+    const antes2 = t.slice(0, cursorActual);
+    const m2 = /(^|[.!?]\s+)([a-záéíóúñ])([\p{L}]*)([\s ]*)$/u.exec(antes2);
     if (m2 && m2[2]) {
       const idx = antes2.length - m2[4].length - m2[3].length - 1;
       nodo.textContent = t.slice(0, idx) + m2[2].toUpperCase() + t.slice(idx + 1);
       const r = document.createRange();
-      const posFin = Math.min(sel.anchorOffset, nodo.textContent.length);
-      r.setStart(nodo, posFin); r.collapse(true);
+      r.setStart(nodo, Math.min(cursorActual, nodo.textContent.length)); r.collapse(true);
       sel.removeAllRanges(); sel.addRange(r);
       cambio = true;
     }

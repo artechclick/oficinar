@@ -32,6 +32,12 @@
       "buildResources": "build",
       "output": "dist"
     },
+    "fileAssociations": [
+      { "ext": ["calc", "xlsx", "xlsm", "xls", "ods", "xlsb", "csv", "tsv"], "name": "Hoja de cálculo de Oficinar", "description": "Hoja de cálculo", "role": "Editor", "icon": "build/icon.png" },
+      { "ext": ["escrito", "docx", "txt", "md", "rtf"], "name": "Documento de Oficinar", "description": "Documento de texto", "role": "Editor", "icon": "build/icon.png" },
+      { "ext": ["presentacion", "pptx"], "name": "Presentación de Oficinar", "description": "Presentación", "role": "Editor", "icon": "build/icon.png" },
+      { "ext": ["pdf"], "name": "Documento PDF", "description": "Documento PDF", "role": "Editor", "icon": "build/icon.png" }
+    ],
     "files": [
       "main.js",
       "launcher/**/*",
