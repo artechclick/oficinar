@@ -313,13 +313,18 @@ function puntoDivisionLinea(bloque, limite) {
 
 // Reunifica cada continuación (primer bloque de una página) con el último bloque
 // de las páginas anteriores; las continuaciones sueltas pierden la marca.
+// OJO: el primer bloque se fija ANTES de fusionar. Enter en contenteditable clona
+// los atributos del párrafo actual (incluido data-continuacion); si primerBloque se
+// evaluara en vivo, el párrafo recién creado "asciende" a primero tras la fusión
+// del auténtico y también sería absorbido: el Enter se desharía solo.
 function fusionarContinuaciones() {
   const pgs = paginasDoc();
   for (let k = 0; k < pgs.length; k++) {
+    const primero = k > 0 ? primerBloque(pgs[k]) : null;
     for (const b of bloquesEn(pgs[k])) {
       if (!b.hasAttribute('data-continuacion')) continue;
       let origen = null;
-      if (k > 0 && b === primerBloque(pgs[k])) {
+      if (b === primero) {
         for (let j = k - 1; j >= 0 && !origen; j--) origen = ultimoBloque(pgs[j]);
       }
       if (origen && origen.tagName === b.tagName && !esSaltoPagina(origen) && !esBloqueProtegido(origen)) {
@@ -547,13 +552,15 @@ function repaginar() {
     i++;
   }
 
-  // Quitar páginas finales vacías (siempre queda al menos una)
+  // Quitar páginas finales sin bloques (siempre queda al menos una).
+  // Solo cuentan las páginas SIN ningún bloque: una página final cuyo único
+  // contenido es un párrafo vacío existe porque ese párrafo no cabe en la
+  // anterior (el bucle de subida ya lo habría reabsorbido si cupiera) — es
+  // justo la página que crea Enter al final del documento y debe conservarse.
   let pgs = paginasDoc();
   while (pgs.length > 1) {
     const u = pgs[pgs.length - 1];
-    const b = bloquesEn(u);
-    const vacia = b.length === 0 || (b.length === 1 && !u.textContent.trim() && !u.querySelector('img, table, hr.salto-pagina'));
-    if (vacia) { u.remove(); pgs = paginasDoc(); } else break;
+    if (bloquesEn(u).length === 0) { u.remove(); pgs = paginasDoc(); } else break;
   }
 
   // La primera página siempre tiene al menos un párrafo editable
@@ -706,22 +713,44 @@ marco.addEventListener('keydown', (e) => {
     const pgs = paginasDoc();
     const idx = pgs.indexOf(p);
     if (idx <= 0) return;
+    // Solo cuenta como "inicio de página" si el cursor está en el PRIMER bloque:
+    // los párrafos vacíos anteriores no aportan texto y un chequeo de texto a nivel
+    // de página los saltaría, impidiendo borrarlos con Backspace.
+    const bloque = bloqueDeNodo(r.startContainer);
+    if (bloque && bloque !== primerBloque(p)) return;
     const antes = document.createRange();
-    antes.selectNodeContents(p);
+    antes.selectNodeContents(bloque || p);
     antes.setEnd(r.startContainer, r.startOffset);
-    if (antes.toString() !== '' || antes.cloneContents().querySelector('img, table')) return;
+    if (antes.toString() !== '' || antes.cloneContents().querySelector('img, table, br')) return;
     e.preventDefault();
     const prev = pgs[idx - 1];
     prev.focus({ preventScroll: true });
+    const ub = ultimoBloque(prev);
     const fin = document.createRange();
-    fin.selectNodeContents(prev);
+    if (ub && !esSaltoPagina(ub)) fin.selectNodeContents(ub);
+    else fin.selectNodeContents(prev);
     fin.collapse(false);
     s.removeAllRanges(); s.addRange(fin);
     guardarRango();
-    // Si la página empezaba con la continuación de un párrafo dividido, el cursor
-    // quedó en el mismo punto lógico: borrar el carácter anterior como haría Word
+    // Cada página es un contenteditable aparte: el navegador no puede unir bloques
+    // entre páginas por sí solo, así que Backspace en el borde se resuelve aquí.
     const primero = primerBloque(p);
-    if (primero && primero.hasAttribute('data-continuacion')) document.execCommand('delete');
+    if (primero && primero.hasAttribute('data-continuacion')) {
+      // Continuación de un párrafo dividido: mismo punto lógico, borrar el
+      // carácter anterior como haría Word
+      document.execCommand('delete');
+    } else if (primero && !primero.textContent.trim() && !primero.querySelector('img, table, hr')) {
+      // Párrafo vacío al inicio de página: Backspace lo elimina
+      primero.remove();
+      marcarModificado();
+    } else if (primero && ub && !esSaltoPagina(ub) &&
+               RE_BLOQUE_DIVISIBLE.test(primero.tagName) && RE_BLOQUE_DIVISIBLE.test(ub.tagName)) {
+      // Unir el párrafo con el último de la página anterior (Backspace al
+      // inicio de párrafo une, no solo mueve el cursor)
+      while (primero.firstChild) ub.appendChild(primero.firstChild);
+      primero.remove();
+      marcarModificado();
+    }
     repaginarPronto();
     return;
   }

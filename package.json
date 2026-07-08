@@ -1,7 +1,7 @@
 {
   "name": "oficinar",
   "productName": "Oficinar",
-  "version": "1.1.0",
+  "version": "1.4.0",
   "description": "Oficinar - Suite de oficina: Calcular, Escribir, Presentar y Editar PDF, con asistente de IA integrado",
   "main": "main.js",
   "scripts": {
